@@ -7,7 +7,7 @@ Description:
     Test demo file to test the Vision Module.
 """
 
-# Import necessary modules
+# Import necessary modules 
 from camera import IrisCamera, print_camera_info
 import cv2
 
@@ -20,7 +20,9 @@ with IrisCamera(0) as camera:
         frame = camera.get_frame()
         if frame is None:
             break
-
+        # Add FPS and show webcam
+        fps = camera.get_frame_rate()
+        cv2.putText(frame, f'FPS: {fps}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
         cv2.imshow('frame', frame)
         if cv2.waitKey(1) == ord('q'):
             break

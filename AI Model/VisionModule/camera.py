@@ -10,6 +10,7 @@ Description:
 
 # Import necessary libraries
 import cv2
+import time
 
 def list_available_cameras(max_to_test=10):
     """
@@ -127,6 +128,23 @@ class IrisCamera:
             tuple: (width, height) containing the resolution of the camera.
         """
         return (self.cam_width, self.cam_height)
+    
+    def get_frame_rate(self):
+        """
+        Get the current frame rate of the camera.
+        
+        Returns:
+            float: The current frame rate of the camera.
+        """
+        # Store previous time as instance variable if not exists
+        if not hasattr(self, 'pTime'):
+            self.pTime = time.time()
+            return 0
+        
+        cTime = time.time()
+        fps = 1 / (cTime - self.pTime)
+        self.pTime = cTime
+        return int(fps)
     
     def __enter__(self):
         """
