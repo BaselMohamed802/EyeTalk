@@ -9,6 +9,7 @@ Description:
 
 # Import necessary modules 
 from camera import IrisCamera, print_camera_info
+from face_utils import FaceDetector
 import cv2
 
 # Test the ports
@@ -23,8 +24,16 @@ with IrisCamera(0) as camera:
         # Add FPS and show webcam
         fps = camera.get_frame_rate()
         cv2.putText(frame, f'FPS: {fps}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+
+        # Show faces
+        frame, bboxes = FaceDetector(min_detection_confidence=0.8, min_tracking_confidence=0.8).findFaces(frame, draw=True, print_score=True)
+
+        # Show webcam
         cv2.imshow('frame', frame)
         if cv2.waitKey(1) == ord('q'):
+            camera.stop_recording()
+            cv2.destroyAllWindows()
+            FaceDetector().release()
             break
 
 
