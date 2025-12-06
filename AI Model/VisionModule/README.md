@@ -298,6 +298,8 @@ This snippet:
 3. Draws debug dots
 4. Shows live tracking
 
+# Summary Table:
+
 | Class                | Key Methods                                         | Purpose                                               |
 | -------------------- | --------------------------------------------------- | ----------------------------------------------------- |
 | **IrisCamera**       | get_frame, get_frame_rate, get_resolution           | Capture webcam frames safely                          |
