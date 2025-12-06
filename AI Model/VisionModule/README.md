@@ -13,7 +13,7 @@ A wrapper around OpenCV's VideoCapture that provides:
 ### Constructor
 - camera = IrisCamera(cam_id, cam_width=640, cam_height=480)
 
-#### Parameters:
+Parameters:
 
 1. cam_id — Camera index (usually 0)
 2. cam_width — Desired capture width
@@ -21,41 +21,30 @@ A wrapper around OpenCV's VideoCapture that provides:
 
 What it does:
 
-Opens the camera
+- Opens the camera
+- Sets its resolution
+- Stores camera state internally
 
-Sets its resolution
-
-Stores camera state internally
-
-Method: get_frame()
-frame = camera.get_frame()
-
-
+#### Method: get_frame()
+- frame = camera.get_frame()
 Returns the latest frame from the webcam.
 
 Returns:
 
-A numpy.ndarray (the image), OR
-
-None if frame cannot be read
+1. A numpy.ndarray (the image)
+2. None if frame cannot be read
 
 Notes:
-
 Automatically used inside loops.
-
 No need to manually check the capture state.
 
-Method: get_frame_rate()
-fps = camera.get_frame_rate()
-
-
+#### Method: get_frame_rate()
+- fps = camera.get_frame_rate()
 Returns an estimated FPS based on time between consecutive calls.
 
 Useful for:
-
-Debugging
-
-Performance tuning
+- Debugging
+- Performance tuning
 
 Method: get_resolution()
 w, h = camera.get_resolution()
