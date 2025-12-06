@@ -1,4 +1,3 @@
-```markdown
 # Module 1 — camera.py
 
 This module abstracts OpenCV camera access into a simple, safe, reusable class.
@@ -102,7 +101,7 @@ Because of the class’s `__enter__` and `__exit__` context manager support.
 
 ---
 
-# 👁️ Module 2 — face_utils.py (FaceMeshDetector)
+# Module 2 — face_utils.py (FaceMeshDetector)
 
 This module handles iris tracking using MediaPipe Face Mesh.
 
@@ -298,6 +297,3 @@ This snippet:
 2. Detects left/right iris positions
 3. Draws debug dots
 4. Shows live tracking
-
-Exactly Phase 1 functionality.
-```
