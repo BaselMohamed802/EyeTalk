@@ -297,3 +297,10 @@ This snippet:
 2. Detects left/right iris positions
 3. Draws debug dots
 4. Shows live tracking
+
+| Class                | Key Methods                                         | Purpose                                               |
+| -------------------- | --------------------------------------------------- | ----------------------------------------------------- |
+| **IrisCamera**       | get_frame, get_frame_rate, get_resolution           | Capture webcam frames safely                          |
+| **FaceMeshDetector** | get_iris_centers, draw_iris_centers, draw_face_mesh | Detect face mesh, iris landmarks, compute iris center |
+
+---
