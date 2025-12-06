@@ -291,28 +291,35 @@ class FaceMeshDetector:
 
         return centers
     
-    def draw_iris_centers(self, img, centers, with_text=False):
+    def draw_iris_centers(self, img, centers, with_text=False, color=None, size=3):
         """
         Draw the center of the left and right iris on the given image.
-
+        
         Args:
             img: A 3-channel color image represented as a numpy array.
             centers: A dictionary containing the center of the left and right iris as tuples of (x, y) coordinates.
-
+            with_text (bool): Whether to add text labels.
+            color (tuple): Custom BGR color tuple. If None, uses default colors.
+            size (int): Circle size.
+            
         Returns:
             The image with the center of the left and right iris drawn on it.
         """
+        # Default colors
+        left_color = color or (0, 255, 0)  # Green
+        right_color = color or (0, 0, 255)  # Red
+        
         if centers.get('left'):
-            cv2.circle(img, centers['left'], 0, (0, 255, 0), 2)
+            cv2.circle(img, centers['left'], size, left_color, 2)
             if with_text:
                 cv2.putText(img, 'L', (centers['left'][0] + 5, centers['left'][1]),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, left_color, 1)
         
         if centers.get('right'):
-            cv2.circle(img, centers['right'], 0, (0, 0, 255), 2)
+            cv2.circle(img, centers['right'], size, right_color, 2)
             if with_text:
                 cv2.putText(img, 'R', (centers['right'][0] + 5, centers['right'][1]),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, right_color, 1)
         
         return img
     
