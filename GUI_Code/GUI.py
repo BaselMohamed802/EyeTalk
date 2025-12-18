@@ -12,7 +12,6 @@ app = QApplication(sys.argv)
 Main_window = Main_GUI_Window()  
 
 
-
 # 3. Show window
 Main_window.show()    
 
