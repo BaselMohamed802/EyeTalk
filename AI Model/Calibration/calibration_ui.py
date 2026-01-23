@@ -1,18 +1,17 @@
 """
 Filename: calibration_ui.py
 Creator/Author: Basel Mohamed Mostafa Sayed
-Date: [Current Date]
+Date: 1/23/2026
 
 Description:
     Calibration UI ONLY - using PySide6 (Qt for Python).
     Responsibilities:
     1. Create a screen-sized window
     2. Draw one calibration dot at a known screen position
-    3. Allow switching between dots programmatically
-    
-    NOTHING ELSE - no eye tracking, no sampling, no data collection.
+    3. Allow switching between dots programmatically (Using space bar to move onto the next dot)
 """
 
+# Import necessary libraries
 import sys
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget
@@ -24,8 +23,6 @@ from PySide6.QtGui import (
 
 
 class CalibrationDotWidget(QWidget):
-    """Widget that displays a single calibration dot."""
-    
     def __init__(self, dot_position=(0.5, 0.5), dot_size=50):
         """
         Initialize the calibration dot widget.
@@ -78,14 +75,14 @@ class CalibrationDotWidget(QWidget):
         
         # Handle case where widget isn't sized yet
         if screen_width == 0 or screen_height == 0:
-            screen_width = 1920  # Default fallback
+            screen_width = 1920  # Default fallback to FHD.
             screen_height = 1080
         
         self.dot_position = QPoint(
             int(x_norm * screen_width),
             int(y_norm * screen_height)
         )
-        self.update()  # Trigger repaint
+        self.update()
         
     def resizeEvent(self, event):
         """Handle widget resize - update dot position."""
@@ -118,7 +115,7 @@ class CalibrationDotWidget(QWidget):
             if self.pulse_size < 0:
                 self.pulse_growing = True
         
-        self.update()  # Trigger repaint
+        self.update()
     
     def paintEvent(self, event):
         """Paint the calibration dot."""
