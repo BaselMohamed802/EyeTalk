@@ -1,0 +1,18 @@
+Main Hardware Components:
+- 1x Raspberry Pi 5 8GB.
+- 1x Raspberry Pi 5 25W USB-C Charger.
+- 1x RPI5 Camera V3 Module.
+- 1x LCD Screen.
+
+Assisting Components:
+- 1x Camera Mounting Module.
+- 1x Heatsink cooling set for RPI5.
+- 1x GPIO Extension cables for RPI5.
+- 1x RPI5 Case with cooling fan.
+
+Accessories:
+- 1x Micro HDMI to HDMI Cable.
+- 1x Memory Card for Raspberry Pi Software OS.
+
+
+

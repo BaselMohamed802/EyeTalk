@@ -25,16 +25,16 @@ face_mesh = FaceMeshDetector(
     min_tracking_confidence=0.7
 )
 
-with IrisCamera(0) as camera:
+with IrisCamera(1) as camera:
     while True:
         frame = camera.get_frame()
         if frame is None:
             break
 
         # Add FPS counter
-        fps = camera.get_frame_rate()
-        cv2.putText(frame, f'FPS: {int(fps)}', (10, 30), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
+        # fps = camera.get_frame_rate()
+        # cv2.putText(frame, f'FPS: {int(fps)}', (10, 30), 
+        #            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
         
         # Get iris centers - RAW
         iris_centers_raw = face_mesh.get_iris_centers(frame)
