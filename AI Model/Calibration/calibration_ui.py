@@ -169,14 +169,14 @@ class CalibrationDotWidget(QWidget):
     
     def draw_instructions(self, painter):
         """Draw minimal instructions at the bottom."""
-        painter.setPen(QColor(200, 200, 200))
+        painter.setPen(QColor(200, 50, 50)) # Hex: #c83232
         font = QFont("Arial", 14)
         painter.setFont(font)
         
         instructions = [
-            "Look at the white dot",
-            "Press ESC to exit calibration",
-            "Press SPACE to move to next point"
+            "Look at the white dot that appears on the screen.",
+            "Press ESC to exit calibration at any point.",
+            "Press SPACE to move to next point."
         ]
         
         screen_height = self.height()
@@ -190,13 +190,28 @@ class CalibrationDotWidget(QWidget):
 
 
 class CalibrationWindow(QMainWindow):
-    """Main calibration window that manages multiple calibration points."""
-    
-    def __init__(self, num_points=9):
+    def __init__(self, num_points=9, margin_screen_edge=0.1):
+        """
+        Initialize the CalibrationWindow with a specified number of points.
+
+        Args:
+            num_points (int, optional): Number of calibration points. Defaults to 9.
+
+        Initializes the window, generates the calibration points, sets up the UI, and shows the first point.
+        """
         super().__init__()
         
-        self.num_points = num_points
+        try:
+            self.num_points = num_points
+        except ValueError:
+            self.num_points = 9
+        except Exception as e:
+            print(f"Error Occured, defaulted to 9 points: {e}")
+            self.num_points = 9
+            
         self.current_point = 0
+
+        self.margin_screen_edge = margin_screen_edge
         
         # Generate calibration points (normalized coordinates 0-1)
         self.calibration_points = self.generate_calibration_points(num_points)
@@ -224,14 +239,11 @@ class CalibrationWindow(QMainWindow):
         else:
             rows, cols = 3, 3
         
-        # Leave 10% margin at edges
-        margin = 0.1
-        
         points = []
         for i in range(rows):
             for j in range(cols):
-                x_norm = margin + j * ((1 - 2 * margin) / (cols - 1))
-                y_norm = margin + i * ((1 - 2 * margin) / (rows - 1))
+                x_norm = self.margin_screen_edge + j * ((1 - 2 * self.margin_screen_edge) / (cols - 1))
+                y_norm = self.margin_screen_edge + i * ((1 - 2 * self.margin_screen_edge) / (rows - 1))
                 points.append((x_norm, y_norm))
         
         return points
@@ -320,41 +332,3 @@ class CalibrationWindow(QMainWindow):
         """Handle window close event."""
         print("\nCalibration UI closed")
         event.accept()
-
-
-def main():
-    """Main function to run the calibration UI."""
-    print("="*60)
-    print("CALIBRATION UI - STEP 1")
-    print("="*60)
-    print("\nThis UI has exactly three responsibilities:")
-    print("1. Create a screen-sized window")
-    print("2. Draw one calibration dot at a known screen position")
-    print("3. Allow switching between dots programmatically")
-    print("\nWhat it does NOT do:")
-    print("❌ Track the eyes")
-    print("❌ Collect iris samples")
-    print("❌ Decide when sampling starts")
-    print("❌ Store calibration data")
-    print("❌ Perform regression")
-    print("\nControls:")
-    print("- SPACE: Move to next calibration point")
-    print("- ESC: Exit calibration")
-    print("="*60 + "\n")
-    
-    # Create Qt application
-    app = QApplication(sys.argv)
-    
-    # Create and show calibration window
-    window = CalibrationWindow(num_points=9)
-    
-    # Print initial instructions
-    print("Calibration UI started. Showing point 1/9")
-    print("Look at the white dot. Press SPACE for next point.")
-    
-    # Run the application
-    sys.exit(app.exec())
-
-
-if __name__ == "__main__":
-    main()
