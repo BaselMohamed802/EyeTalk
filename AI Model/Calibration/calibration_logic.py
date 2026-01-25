@@ -40,7 +40,6 @@ class CalibrationTimingController:
         self.settling_delay = settling_delay
         self.fixation_start_time = None
         self.waiting_for_fixation = False
-
         
         # Store UI reference (if provided)
         self.ui = ui
@@ -60,7 +59,7 @@ class CalibrationTimingController:
         print(f"Timing controller initialized with {num_points} points")
         print(f"Settling delay: {settling_delay}s")
     
-    def _generate_calibration_points(self, num_points: int):
+    def _generate_calibration_points(self, num_points: int, margin_screen_edge: float = 0.1):
         """Generate normalized calibration points (0-1)."""
         if num_points == 9:
             rows, cols = 3, 3
@@ -68,9 +67,9 @@ class CalibrationTimingController:
             rows, cols = 4, 4
         else:
             rows, cols = 3, 3
-        
-        # Leave 10% margin at edges
-        margin = 0.1
+
+        # Assign margin        
+        margin = margin_screen_edge
         
         points = []
         for i in range(rows):
