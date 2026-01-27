@@ -235,8 +235,8 @@ class CalibrationSampler:
         # Create sample (No Filter enabled)
         sample = CalibrationSample(
             timestamp=time.time(),
-            left_iris=left_iris,
-            right_iris=right_iris
+            left_iris=filtered_left,
+            right_iris=filtered_right
         )
         
         # Add to current data point

@@ -4,3 +4,4 @@ numpy
 matplotlib
 pyautogui
 Pyside6
+screeninfo

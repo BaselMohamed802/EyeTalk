@@ -1,5 +1,5 @@
 """
-Filename: runtime_tracker.py
+Filename: gaze_runtime_controller.py
 Creator/Author: Basel Mohamed Mostafa Sayed
 Date: 1/26/2026
 
@@ -65,7 +65,7 @@ class RuntimeEyeTracker:
         # Screen properties
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.safety_margin = safety_margin
+        self.safety_margin = float(np.clip(safety_margin, 0.0, 0.49))
         
         # State
         self.model_loaded = False
@@ -73,6 +73,9 @@ class RuntimeEyeTracker:
         self.last_prediction = None
         self.prediction_count = 0
         
+        # Setting up SKlearn
+        self.sklearn_available = False
+
         # Statistics
         self.stats = {
             'total_predictions': 0,
@@ -118,6 +121,11 @@ class RuntimeEyeTracker:
             # Load model components
             self.model_x = model_data.get('model_x')
             self.model_y = model_data.get('model_y')
+
+            # Prevent partial/corrupt model loads
+            if isinstance(self.model_x, dict) != isinstance(self.model_y, dict):
+                print("[Runtime] Error: model_x/model_y types mismatch")
+                return False
             
             # Basic validation
             if not self.model_info['is_trained']:
@@ -127,15 +135,17 @@ class RuntimeEyeTracker:
                 print("[Runtime] Error: Model components not found in file")
                 return False
             
-            # Check if scikit-learn is available for sklearn models
-            if (not isinstance(self.model_x, dict) or not isinstance(self.model_y, dict)):
+            # Decide if this is a dict-based fallback model or sklearn model
+            if isinstance(self.model_x, dict) and isinstance(self.model_y, dict):
+                self.sklearn_available = False
+            else:
                 try:
-                    import sklearn
+                    import sklearn 
                     self.sklearn_available = True
                 except ImportError:
-                    print("[Runtime] Warning: scikit-learn not available but model appears to be sklearn-based")
-                    self.sklearn_available = False
-            
+                    print("[Runtime] Error: scikit-learn not installed but the loaded model is sklearn-based.")
+                    return False
+
             self.model_loaded = True
             print(f"[Runtime] Model loaded successfully from {model_path}")
             
@@ -200,7 +210,7 @@ class RuntimeEyeTracker:
             (screen_x_norm, screen_y_norm) normalized coordinates (0-1)
         """
         if not self.model_loaded:
-            raise RuntimeError("Model not loaded. Call load_model() first.")
+            raise RuntimeError("Model not loaded. Check model path / model file validity.")
         
         if not self.tracking_active:
             print("[Runtime] Warning: Tracking not active, prediction may be unstable")
@@ -224,10 +234,10 @@ class RuntimeEyeTracker:
         try:
             raw_screen_x, raw_screen_y = self._raw_regression_predict(eye_x, eye_y)
 
-            # Filter FIRST
+            # Filter FIRST (FilterManager expects (x, y) and returns (x, y))
             if self.filter_x and self.filter_y:
-                filtered_x = self.filter_x.apply(raw_screen_x)
-                filtered_y = self.filter_y.apply(raw_screen_y)
+                filtered_x, _ = self.filter_x.apply_filter(raw_screen_x, 0.0)
+                _, filtered_y = self.filter_y.apply_filter(0.0, raw_screen_y)
             else:
                 filtered_x, filtered_y = raw_screen_x, raw_screen_y
 
@@ -280,12 +290,15 @@ class RuntimeEyeTracker:
             screen_y = float(self.model_y.predict(X_input)[0])
         elif isinstance(self.model_x, dict) and isinstance(self.model_y, dict):
             # Use simple linear model
-            coeff_x = self.model_x['coeff']
-            coeff_y = self.model_y['coeff']
-            
-            # Add bias term
-            X_with_bias = np.array([[eye_x, eye_y, 1.0]])
-            
+            coeff_x = np.asarray(self.model_x['coeff'], dtype=float).reshape(-1)
+            coeff_y = np.asarray(self.model_y['coeff'], dtype=float).reshape(-1)
+
+            if coeff_x.shape[0] != 3 or coeff_y.shape[0] != 3:
+                raise RuntimeError("Dict model coeff must have 3 terms: [ax, ay, bias]")
+
+            # Add bias
+            X_with_bias = np.array([eye_x, eye_y, 1.0], dtype=float)
+
             screen_x = float(X_with_bias @ coeff_x)
             screen_y = float(X_with_bias @ coeff_y)
         else:
@@ -444,8 +457,8 @@ class EyeTrackingRuntime:
     def __init__(self, 
                  model_path: str = "calibration_model.pkl",
                  camera_id: int = 0,
-                 screen_width: int = None,
-                 screen_height: int = None,
+                 screen_width: int = 1920,
+                 screen_height: int = 1080,
                  filter_type: str = "ema"):
         """
         Initialize eye tracking runtime.
@@ -511,7 +524,7 @@ class EyeTrackingRuntime:
         # Initialize camera if not already
         if self.camera is None:
             try:
-                from camera import IrisCamera
+                from VisionModule.camera import IrisCamera
                 self.camera = IrisCamera(self.camera_id)
                 print(f"[EyeTracking] Camera {self.camera_id} initialized")
             except ImportError:
@@ -521,7 +534,7 @@ class EyeTrackingRuntime:
         # Initialize face mesh detector if not already
         if self.face_mesh_detector is None:
             try:
-                from face_utils import FaceMeshDetector
+                from VisionModule.face_utils import FaceMeshDetector
                 self.face_mesh_detector = FaceMeshDetector()
                 print("[EyeTracking] Face mesh detector initialized")
             except ImportError:
@@ -583,7 +596,7 @@ class EyeTrackingRuntime:
             # Add iris information
             result['iris_left'] = left_iris
             result['iris_right'] = right_iris
-            result['timestamp'] = time.time() if 'time' in globals() else 0
+            result['timestamp'] = time.time()
             
             return result
             
