@@ -1,6 +1,6 @@
 """
 Filename: run_calibration.py
-Creator/Author: Basel Mohamed Mostafa Sayed + ChatGPT
+Creator/Author: Basel Mohamed Mostafa Sayed
 Date: 1/27/2026
 
 Purpose:
