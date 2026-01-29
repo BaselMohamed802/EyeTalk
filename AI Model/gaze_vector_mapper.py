@@ -2,17 +2,24 @@
 Filename: gaze_vector_mapper.py
 Creator/Author: Basel Mohamed Mostafa Sayed + ChatGPT
 Date: 1/27/2026
+Updated: 1/28/2026
 
 Description:
     3D Gaze Vector based cursor control.
     Uses geometric intersection of gaze vectors with screen plane.
     
+    Key improvements:
+    1. Uses proper calibration to estimate screen plane (not assumed metrics)
+    2. Handles MediaPipe's relative coordinate system properly
+    3. Estimates plane+basis from calibration points via SVD
+    4. Uses both iris origin and direction for each eye
+    
     Steps:
     1. Get 3D eye landmarks from MediaPipe
-    2. Calculate gaze vectors for each eye
-    3. Calibrate screen plane parameters
+    2. Calculate gaze vectors with proper origins
+    3. Calibrate screen plane and basis from known points
     4. Intersect gaze vectors with screen plane
-    5. Map intersection points to screen coordinates
+    5. Map intersection points to screen coordinates using learned basis
 """
 
 import numpy as np
@@ -20,6 +27,22 @@ import pickle
 import time
 from typing import Tuple, Optional, Dict, Any, List
 import math
+from dataclasses import dataclass
+
+
+@dataclass
+class GazeRay:
+    """Represents a gaze ray with origin and direction."""
+    origin: np.ndarray  # 3D point where ray starts (eye center)
+    direction: np.ndarray  # 3D normalized gaze direction
+
+
+@dataclass 
+class CalibrationSample3D:
+    """3D calibration sample with complete ray information."""
+    ray: GazeRay  # Origin + direction
+    screen_uv: Tuple[float, float]  # Known screen position (normalized 0-1)
+    timestamp: float
 
 
 class GazeVectorMapper:
@@ -31,6 +54,9 @@ class GazeVectorMapper:
     2. Accounts for head movement naturally
     3. Based on actual eye anatomy
     4. Better extrapolation outside calibration range
+    
+    Key improvement: Learns screen plane and basis from calibration,
+    doesn't assume metric measurements.
     """
     
     def __init__(self, calibration_path: Optional[str] = None):
@@ -49,40 +75,45 @@ class GazeVectorMapper:
             'right_eye_inner': 362,
             'right_eye_outer': 263,
             
-            # Iris centers (3D when refine_landmarks=True)
-            'left_iris': 468,
-            'right_iris': 473,
+            # Iris ring landmarks (4 per eye) - for better center estimation
+            'left_iris_ring': [468, 469, 470, 471],
+            'right_iris_ring': [473, 474, 475, 476],
             
-            # Face reference points
+            # Face reference points for coordinate frame
             'nose_tip': 1,
             'forehead': 10,
             'chin': 152,
-            'left_mouth': 61,
-            'right_mouth': 291,
+            'left_ear': 234,  # Approximate
+            'right_ear': 454,  # Approximate
         }
         
         # Screen plane parameters (will be calibrated)
         # Screen plane equation: n·(x - p0) = 0
-        self.screen_normal = None      # Normal vector to screen (unit vector)
-        self.screen_center = None      # Point on screen plane (3D)
-        self.screen_distance = None    # Distance from eyes to screen (approx)
+        self.plane_normal = None      # Normal vector to screen (unit vector)
+        self.plane_point = None       # Any point on the plane
         
-        # Eye parameters (anatomical, in meters)
-        self.eye_radius = 0.012        # Average eye radius (12mm)
-        self.interpupillary_distance = 0.063  # Average IPD (63mm)
+        # Screen coordinate system on the plane
+        self.screen_origin = None     # Point on plane corresponding to (0,0)
+        self.screen_u_axis = None     # Direction for increasing x
+        self.screen_v_axis = None     # Direction for increasing y
+        self.screen_width = None      # Scale in u direction
+        self.screen_height = None     # Scale in v direction
         
         # Calibration data
-        self.calibration_points = []   # List of (gaze_vector, screen_point)
+        self.calibration_samples: List[CalibrationSample3D] = []
         self.is_calibrated = False
         
         # State
-        self.current_gaze_vector = None
+        self.current_ray: Optional[GazeRay] = None
         self.current_intersection = None
-        self.last_screen_point = None
+        self.last_screen_uv = None
         
         # Smoothing
-        self.smoothed_gaze_vector = None
-        self.smoothing_factor = 0.3
+        self.smoothed_direction = None
+        self.smoothing_alpha = 0.3
+        
+        # Eye anatomical estimates (relative to MediaPipe scale)
+        self.eyeball_depth_factor = 0.3  # Eyeball center behind eyelid midpoint
         
         # Load calibration if provided
         if calibration_path and self._load_calibration(calibration_path):
@@ -93,10 +124,17 @@ class GazeVectorMapper:
     
     def _initialize_default_geometry(self):
         """Initialize with default screen geometry assumptions."""
-        # Assume screen is directly in front, 60cm away
-        self.screen_normal = np.array([0, 0, 1])  # Looking into -Z direction
-        self.screen_center = np.array([0, 0, -0.6])  # 60cm in front
-        self.screen_distance = 0.6
+        # In MediaPipe coordinates, assume screen is in front
+        # This will be replaced by proper calibration
+        self.plane_normal = np.array([0, 0, -1])  # Plane facing camera
+        self.plane_point = np.array([0, 0, -2])   # Some distance in front
+        
+        # Default screen coordinate system (aligned with plane)
+        self.screen_origin = np.array([-1, 1, -2])  # Top-left
+        self.screen_u_axis = np.array([1, 0, 0])    # Right
+        self.screen_v_axis = np.array([0, -1, 0])   # Down
+        self.screen_width = 2.0
+        self.screen_height = 2.0
     
     def _load_calibration(self, path: str) -> bool:
         """Load gaze vector calibration data."""
@@ -104,10 +142,15 @@ class GazeVectorMapper:
             with open(path, 'rb') as f:
                 data = pickle.load(f)
             
-            if 'screen_normal' in data and 'screen_center' in data:
-                self.screen_normal = np.array(data['screen_normal'])
-                self.screen_center = np.array(data['screen_center'])
-                self.screen_distance = data.get('screen_distance', 0.6)
+            if ('plane_normal' in data and 'plane_point' in data and 
+                'screen_origin' in data and 'screen_u_axis' in data):
+                self.plane_normal = np.array(data['plane_normal'])
+                self.plane_point = np.array(data['plane_point'])
+                self.screen_origin = np.array(data['screen_origin'])
+                self.screen_u_axis = np.array(data['screen_u_axis'])
+                self.screen_v_axis = np.array(data['screen_v_axis'])
+                self.screen_width = data['screen_width']
+                self.screen_height = data['screen_height']
                 self.is_calibrated = True
                 return True
         except Exception as e:
@@ -122,10 +165,20 @@ class GazeVectorMapper:
             return False
         
         data = {
-            'screen_normal': self.screen_normal.tolist(),
-            'screen_center': self.screen_center.tolist(),
-            'screen_distance': self.screen_distance,
-            'calibration_points': self.calibration_points,
+            'plane_normal': self.plane_normal.tolist(),
+            'plane_point': self.plane_point.tolist(),
+            'screen_origin': self.screen_origin.tolist(),
+            'screen_u_axis': self.screen_u_axis.tolist(),
+            'screen_v_axis': self.screen_v_axis.tolist(),
+            'screen_width': self.screen_width,
+            'screen_height': self.screen_height,
+            'calibration_samples': [
+                (sample.ray.origin.tolist(), 
+                 sample.ray.direction.tolist(), 
+                 sample.screen_uv, 
+                 sample.timestamp)
+                for sample in self.calibration_samples
+            ],
             'timestamp': time.time()
         }
         
@@ -138,18 +191,18 @@ class GazeVectorMapper:
             print(f"[GazeVectorMapper] Error saving calibration: {e}")
             return False
     
-    def calculate_gaze_vector(self, landmarks_3d: List) -> Tuple[Optional[np.ndarray], Dict[str, Any]]:
+    def calculate_gaze_ray(self, landmarks_3d: List) -> Optional[GazeRay]:
         """
-        Calculate 3D gaze vector from MediaPipe 3D landmarks.
+        Calculate 3D gaze ray from MediaPipe 3D landmarks.
+        
+        Improved: Uses iris ring for better center, estimates eyeball position.
         
         Args:
             landmarks_3d: List of MediaPipe 3D landmarks
             
         Returns:
-            (gaze_vector, debug_info)
+            GazeRay object with origin and direction, or None if failed
         """
-        debug_info = {}
-        
         try:
             # Get eye corner landmarks
             left_inner = landmarks_3d[self.LANDMARK_INDICES['left_eye_inner']]
@@ -157,127 +210,390 @@ class GazeVectorMapper:
             right_inner = landmarks_3d[self.LANDMARK_INDICES['right_eye_inner']]
             right_outer = landmarks_3d[self.LANDMARK_INDICES['right_eye_outer']]
             
-            # Get iris centers (3D!)
-            left_iris = landmarks_3d[self.LANDMARK_INDICES['left_iris']]
-            right_iris = landmarks_3d[self.LANDMARK_INDICES['right_iris']]
-            
-            # Convert to numpy arrays
+            # Convert to numpy
             left_inner_np = np.array([left_inner.x, left_inner.y, left_inner.z])
             left_outer_np = np.array([left_outer.x, left_outer.y, left_outer.z])
             right_inner_np = np.array([right_inner.x, right_inner.y, right_inner.z])
             right_outer_np = np.array([right_outer.x, right_outer.y, right_outer.z])
-            left_iris_np = np.array([left_iris.x, left_iris.y, left_iris.z])
-            right_iris_np = np.array([right_iris.x, right_iris.y, right_iris.z])
             
             # Calculate eye centers (midpoint of inner and outer corners)
             left_eye_center = (left_inner_np + left_outer_np) / 2
             right_eye_center = (right_inner_np + right_outer_np) / 2
             
-            # Calculate gaze vectors (from eye center to iris)
-            left_gaze = left_iris_np - left_eye_center
-            right_gaze = right_iris_np - right_eye_center
+            # Estimate eyeball center (behind eyelid)
+            # Use face forward direction (nose to forehead) as reference
+            nose_tip = landmarks_3d[self.LANDMARK_INDICES['nose_tip']]
+            forehead = landmarks_3d[self.LANDMARK_INDICES['forehead']]
+            face_forward = np.array([forehead.x - nose_tip.x, 
+                                     forehead.y - nose_tip.y, 
+                                     forehead.z - nose_tip.z])
+            face_forward = face_forward / np.linalg.norm(face_forward)
             
-            # Normalize gaze vectors
-            left_gaze_norm = left_gaze / np.linalg.norm(left_gaze)
-            right_gaze_norm = right_gaze / np.linalg.norm(right_gaze)
+            # Eyeball center is behind eyelid along face forward direction
+            left_eyeball_center = left_eye_center - self.eyeball_depth_factor * face_forward
+            right_eyeball_center = right_eye_center - self.eyeball_depth_factor * face_forward
             
-            # Average both gaze vectors for more stability
-            gaze_vector = (left_gaze_norm + right_gaze_norm) / 2
-            gaze_vector = gaze_vector / np.linalg.norm(gaze_vector)
+            # Calculate iris centers from iris ring landmarks
+            left_iris_centers = []
+            for idx in self.LANDMARK_INDICES['left_iris_ring']:
+                lm = landmarks_3d[idx]
+                left_iris_centers.append([lm.x, lm.y, lm.z])
             
-            # Calculate head position (midpoint between eyes)
-            head_position = (left_eye_center + right_eye_center) / 2
+            right_iris_centers = []
+            for idx in self.LANDMARK_INDICES['right_iris_ring']:
+                lm = landmarks_3d[idx]
+                right_iris_centers.append([lm.x, lm.y, lm.z])
             
-            # Store debug info
-            debug_info.update({
-                'left_eye_center': left_eye_center,
-                'right_eye_center': right_eye_center,
-                'head_position': head_position,
-                'left_gaze': left_gaze_norm,
-                'right_gaze': right_gaze_norm,
-                'ipd': np.linalg.norm(right_eye_center - left_eye_center)
-            })
+            left_iris_center = np.mean(left_iris_centers, axis=0)
+            right_iris_center = np.mean(right_iris_centers, axis=0)
             
-            return gaze_vector, debug_info
+            # Calculate gaze directions (from eyeball center to iris center)
+            left_gaze_dir = left_iris_center - left_eyeball_center
+            right_gaze_dir = right_iris_center - right_eyeball_center
+            
+            # Normalize
+            left_gaze_dir = left_gaze_dir / np.linalg.norm(left_gaze_dir)
+            right_gaze_dir = right_gaze_dir / np.linalg.norm(right_gaze_dir)
+            
+            # Average for combined gaze
+            combined_direction = (left_gaze_dir + right_gaze_dir) / 2
+            combined_direction = combined_direction / np.linalg.norm(combined_direction)
+            
+            # Use midpoint between eyeballs as ray origin
+            combined_origin = (left_eyeball_center + right_eyeball_center) / 2
+            
+            return GazeRay(origin=combined_origin, direction=combined_direction)
             
         except Exception as e:
-            print(f"[GazeVectorMapper] Error calculating gaze vector: {e}")
-            return None, {}
+            print(f"[GazeVectorMapper] Error calculating gaze ray: {e}")
+            return None
     
-    def intersect_with_screen(self, gaze_vector: np.ndarray, head_position: np.ndarray) -> Optional[np.ndarray]:
+    def intersect_ray_with_plane(self, ray: GazeRay) -> Optional[np.ndarray]:
         """
-        Intersect gaze vector with screen plane.
+        Intersect gaze ray with screen plane.
         
         Args:
-            gaze_vector: Normalized 3D gaze direction
-            head_position: 3D position of head (between eyes)
+            ray: GazeRay with origin and direction
             
         Returns:
-            3D intersection point on screen plane, or None if no intersection
+            3D intersection point on plane, or None if no intersection
         """
-        if self.screen_normal is None or self.screen_center is None:
+        if self.plane_normal is None or self.plane_point is None:
             return None
         
-        # Ray: p = head_position + t * gaze_vector
-        # Plane: n·(p - p0) = 0
+        # Ray: P = O + t * D
+        # Plane: n·(P - P0) = 0
         
-        # Solve for t: n·(head_position + t*gaze_vector - p0) = 0
-        # t = n·(p0 - head_position) / (n·gaze_vector)
+        # Solve for t: n·(O + tD - P0) = 0
+        # t = n·(P0 - O) / (n·D)
         
-        numerator = np.dot(self.screen_normal, self.screen_center - head_position)
-        denominator = np.dot(self.screen_normal, gaze_vector)
+        numerator = np.dot(self.plane_normal, self.plane_point - ray.origin)
+        denominator = np.dot(self.plane_normal, ray.direction)
         
-        # Avoid division by zero (gaze parallel to screen)
-        if abs(denominator) < 1e-6:
+        # Avoid division by zero (ray parallel to plane)
+        if abs(denominator) < 1e-10:
             return None
         
         t = numerator / denominator
         
+        # Only accept intersections in front of the ray
+        if t < 0:
+            return None
+        
         # Intersection point
-        intersection = head_position + t * gaze_vector
+        intersection = ray.origin + t * ray.direction
         
         return intersection
     
-    def calibrate_screen_plane(self, calibration_data: List[Tuple[np.ndarray, Tuple[float, float]]]):
+    def plane_coordinates_to_uv(self, point_on_plane: np.ndarray) -> Tuple[float, float]:
         """
-        Calibrate screen plane from gaze vectors and known screen points.
+        Convert a point on the plane to normalized screen coordinates.
         
         Args:
-            calibration_data: List of (gaze_vector, (screen_x, screen_y))
-                             screen_x, screen_y are normalized [0, 1]
+            point_on_plane: 3D point on the screen plane
+            
+        Returns:
+            Normalized screen coordinates (u, v) in [0, 1]
         """
-        if len(calibration_data) < 3:
-            print("[GazeVectorMapper] Need at least 3 calibration points")
+        if (self.screen_origin is None or self.screen_u_axis is None or 
+            self.screen_v_axis is None):
+            return 0.5, 0.5  # Center as fallback
+        
+        # Vector from screen origin to point
+        v_to_point = point_on_plane - self.screen_origin
+        
+        # Project onto u and v axes
+        u = np.dot(v_to_point, self.screen_u_axis) / self.screen_width
+        v = np.dot(v_to_point, self.screen_v_axis) / self.screen_height
+        
+        # Clamp to [0, 1]
+        u = max(0.0, min(1.0, u))
+        v = max(0.0, min(1.0, v))
+        
+        return u, v
+    
+    def calibrate_from_samples(self, samples: List[CalibrationSample3D]) -> bool:
+        """
+        Calibrate screen plane and coordinate system from samples.
+        
+        Uses iterative SVD-based plane fitting and corner-based basis estimation.
+        
+        Args:
+            samples: List of calibration samples
+            
+        Returns:
+            True if calibration successful
+        """
+        if len(samples) < 4:
+            print(f"[GazeVectorMapper] Need at least 4 points, got {len(samples)}")
             return False
         
-        self.calibration_points = calibration_data
+        self.calibration_samples = samples
         
-        # For simplicity, we'll use a geometric approach:
-        # Assume screen is a plane at fixed distance, find orientation
+        print(f"[GazeVectorMapper] Calibrating from {len(samples)} samples...")
         
-        # Method: Use three points to define a plane
-        # We'll use the gaze vectors from center, top-left, and top-right points
+        # Step 1: Find best-fit plane using iterative refinement
+        if not self._estimate_plane_iterative(samples):
+            print("[GazeVectorMapper] Plane estimation failed")
+            return False
         
-        # Find the calibration point closest to screen center (0.5, 0.5)
-        center_idx = 0
-        min_dist = float('inf')
-        for i, (_, screen_pos) in enumerate(calibration_data):
-            dist = (screen_pos[0] - 0.5)**2 + (screen_pos[1] - 0.5)**2
-            if dist < min_dist:
-                min_dist = dist
-                center_idx = i
-        
-        # Use center point and two edge points
-        center_gaze, center_screen = calibration_data[center_idx]
-        
-        # For now, use simple assumptions (calibration will be improved)
-        # Assume screen is 60cm away, directly in front
-        self.screen_distance = 0.6
-        self.screen_normal = np.array([0, 0, 1])  # Looking into -Z
-        self.screen_center = np.array([0, 0, -self.screen_distance])
+        # Step 2: Estimate screen coordinate system from corner points
+        if not self._estimate_screen_coordinate_system(samples):
+            print("[GazeVectorMapper] Screen coordinate system estimation failed")
+            return False
         
         self.is_calibrated = True
-        print("[GazeVectorMapper] Screen plane calibrated")
+        print("[GazeVectorMapper] Calibration successful!")
+        self._print_calibration_summary()
+        
+        return True
+    
+    def _estimate_plane_iterative(self, samples: List[CalibrationSample3D], 
+                                 max_iterations: int = 10, 
+                                 tolerance: float = 1e-6) -> bool:
+        """
+        Iteratively estimate plane using SVD.
+        
+        Alternates between:
+        1. Intersecting rays with current plane to get 3D points
+        2. Fitting new plane to those points via SVD
+        
+        Args:
+            samples: Calibration samples
+            max_iterations: Maximum iterations
+            tolerance: Convergence tolerance
+            
+        Returns:
+            True if successful
+        """
+        # Initial guess: plane facing camera, some distance away
+        self.plane_normal = np.array([0, 0, -1])
+        self.plane_point = np.array([0, 0, -2])
+        
+        for iteration in range(max_iterations):
+            # Step 1: Intersect all rays with current plane
+            points_3d = []
+            valid_samples = []
+            
+            for sample in samples:
+                intersection = self.intersect_ray_with_plane(sample.ray)
+                if intersection is not None:
+                    points_3d.append(intersection)
+                    valid_samples.append(sample)
+            
+            if len(points_3d) < 3:
+                print(f"[GazeVectorMapper] Only {len(points_3d)} valid intersections")
+                return False
+            
+            points_array = np.array(points_3d)
+            
+            # Step 2: Fit new plane to these points using SVD
+            # Center the points
+            centroid = np.mean(points_array, axis=0)
+            centered = points_array - centroid
+            
+            # SVD to find normal (smallest singular vector)
+            U, S, Vt = np.linalg.svd(centered, full_matrices=False)
+            new_normal = Vt[-1]  # Last row of V^T is the smallest singular vector
+            
+            # Ensure normal points toward camera (negative z in MediaPipe coords)
+            if new_normal[2] > 0:
+                new_normal = -new_normal
+            
+            # Check for convergence
+            if iteration > 0:
+                angle_change = np.arccos(np.clip(
+                    np.dot(self.plane_normal, new_normal), -1.0, 1.0
+                ))
+                if angle_change < tolerance:
+                    print(f"[GazeVectorMapper] Plane converged after {iteration+1} iterations")
+                    break
+            
+            # Update plane
+            self.plane_normal = new_normal
+            self.plane_point = centroid
+            
+            if iteration == max_iterations - 1:
+                print(f"[GazeVectorMapper] Plane estimation reached max iterations")
+        
+        return True
+    
+    def _estimate_screen_coordinate_system(self, samples: List[CalibrationSample3D]) -> bool:
+        """
+        Estimate screen coordinate system from corner calibration points.
+        
+        Requires at least 4 samples including corners.
+        
+        Args:
+            samples: Calibration samples
+            
+        Returns:
+            True if successful
+        """
+        # Find corner samples
+        corners = {
+            'tl': None,  # top-left (0,0)
+            'tr': None,  # top-right (1,0)
+            'bl': None,  # bottom-left (0,1)
+            'br': None   # bottom-right (1,1)
+        }
+        
+        for sample in samples:
+            u, v = sample.screen_uv
+            
+            # Check if this is a corner (within threshold)
+            threshold = 0.2
+            if u < threshold and v < threshold:
+                corners['tl'] = sample
+            elif u > 1 - threshold and v < threshold:
+                corners['tr'] = sample
+            elif u < threshold and v > 1 - threshold:
+                corners['bl'] = sample
+            elif u > 1 - threshold and v > 1 - threshold:
+                corners['br'] = sample
+        
+        # We need at least 3 corners to define the coordinate system
+        corner_count = sum(1 for c in corners.values() if c is not None)
+        if corner_count < 3:
+            print(f"[GazeVectorMapper] Need at least 3 corners, found {corner_count}")
+            
+            # Fallback: use extreme points
+            return self._estimate_coords_from_extremes(samples)
+        
+        # Intersect corner rays with plane to get 3D corner points
+        corner_points = {}
+        for key, sample in corners.items():
+            if sample is not None:
+                intersection = self.intersect_ray_with_plane(sample.ray)
+                if intersection is not None:
+                    corner_points[key] = intersection
+        
+        if len(corner_points) < 3:
+            print(f"[GazeVectorMapper] Could only intersect {len(corner_points)} corners")
+            return self._estimate_coords_from_extremes(samples)
+        
+        # Define coordinate system
+        # Use top-left as origin if available
+        if 'tl' in corner_points:
+            self.screen_origin = corner_points['tl']
+        else:
+            # Use available corner as origin
+            first_key = next(iter(corner_points.keys()))
+            self.screen_origin = corner_points[first_key]
+        
+        # Determine u-axis (right) and v-axis (down)
+        if 'tr' in corner_points and 'tl' in corner_points:
+            self.screen_u_axis = corner_points['tr'] - corner_points['tl']
+            self.screen_width = np.linalg.norm(self.screen_u_axis)
+            self.screen_u_axis = self.screen_u_axis / self.screen_width
+        elif 'br' in corner_points and 'bl' in corner_points:
+            # Use bottom edge
+            self.screen_u_axis = corner_points['br'] - corner_points['bl']
+            self.screen_width = np.linalg.norm(self.screen_u_axis)
+            self.screen_u_axis = self.screen_u_axis / self.screen_width
+        
+        if 'bl' in corner_points and 'tl' in corner_points:
+            self.screen_v_axis = corner_points['bl'] - corner_points['tl']
+            self.screen_height = np.linalg.norm(self.screen_v_axis)
+            self.screen_v_axis = self.screen_v_axis / self.screen_height
+        elif 'br' in corner_points and 'tr' in corner_points:
+            # Use right edge
+            self.screen_v_axis = corner_points['br'] - corner_points['tr']
+            self.screen_height = np.linalg.norm(self.screen_v_axis)
+            self.screen_v_axis = self.screen_v_axis / self.screen_height
+        
+        # Ensure orthogonality (u and v may not be perfectly perpendicular)
+        # Make v orthogonal to u
+        if self.screen_u_axis is not None and self.screen_v_axis is not None:
+            v_parallel = np.dot(self.screen_v_axis, self.screen_u_axis) * self.screen_u_axis
+            self.screen_v_axis = self.screen_v_axis - v_parallel
+            self.screen_v_axis = self.screen_v_axis / np.linalg.norm(self.screen_v_axis)
+            
+            # Ensure right-handed coordinate system
+            cross = np.cross(self.screen_u_axis, self.screen_v_axis)
+            if np.dot(cross, self.plane_normal) < 0:
+                self.screen_v_axis = -self.screen_v_axis
+        
+        return True
+    
+    def _estimate_coords_from_extremes(self, samples: List[CalibrationSample3D]) -> bool:
+        """
+        Fallback: estimate coordinate system from extreme points.
+        
+        Args:
+            samples: Calibration samples
+            
+        Returns:
+            True if successful
+        """
+        print("[GazeVectorMapper] Using fallback coordinate estimation from extremes")
+        
+        # Intersect all rays with plane
+        intersections = []
+        valid_samples = []
+        
+        for sample in samples:
+            intersection = self.intersect_ray_with_plane(sample.ray)
+            if intersection is not None:
+                intersections.append(intersection)
+                valid_samples.append(sample)
+        
+        if len(intersections) < 3:
+            return False
+        
+        # Find bounding box of intersection points
+        points_array = np.array(intersections)
+        min_coords = np.min(points_array, axis=0)
+        max_coords = np.max(points_array, axis=0)
+        
+        # Use center of bounding box as origin
+        self.screen_origin = (min_coords + max_coords) / 2
+        
+        # Use principal components as axes
+        centered = points_array - self.screen_origin
+        U, S, Vt = np.linalg.svd(centered, full_matrices=False)
+        
+        # First two principal components as axes
+        self.screen_u_axis = Vt[0]
+        self.screen_v_axis = Vt[1]
+        
+        # Ensure v-axis is orthogonal to u-axis
+        v_parallel = np.dot(self.screen_v_axis, self.screen_u_axis) * self.screen_u_axis
+        self.screen_v_axis = self.screen_v_axis - v_parallel
+        self.screen_v_axis = self.screen_v_axis / np.linalg.norm(self.screen_v_axis)
+        
+        # Determine scale from bounding box
+        # Project all points onto axes to find extents
+        u_coords = np.dot(points_array - self.screen_origin, self.screen_u_axis)
+        v_coords = np.dot(points_array - self.screen_origin, self.screen_v_axis)
+        
+        self.screen_width = np.max(u_coords) - np.min(u_coords)
+        self.screen_height = np.max(v_coords) - np.min(v_coords)
+        
+        # Adjust origin to be at min u, min v
+        self.screen_origin = self.screen_origin + \
+                           np.min(u_coords) * self.screen_u_axis + \
+                           np.min(v_coords) * self.screen_v_axis
         
         return True
     
@@ -291,71 +607,46 @@ class GazeVectorMapper:
         Returns:
             True if successful
         """
-        gaze_vector, debug_info = self.calculate_gaze_vector(landmarks_3d)
+        ray = self.calculate_gaze_ray(landmarks_3d)
         
-        if gaze_vector is None:
+        if ray is None:
             return False
         
-        # Apply smoothing
-        if self.smoothed_gaze_vector is None:
-            self.smoothed_gaze_vector = gaze_vector
+        # Apply smoothing to direction
+        if self.smoothed_direction is None:
+            self.smoothed_direction = ray.direction
         else:
-            self.smoothed_gaze_vector = (
-                self.smoothing_factor * gaze_vector + 
-                (1 - self.smoothing_factor) * self.smoothed_gaze_vector
+            self.smoothed_direction = (
+                self.smoothing_alpha * ray.direction + 
+                (1 - self.smoothing_alpha) * self.smoothed_direction
             )
-            # Re-normalize
-            self.smoothed_gaze_vector = self.smoothed_gaze_vector / np.linalg.norm(self.smoothed_gaze_vector)
+            self.smoothed_direction = self.smoothed_direction / np.linalg.norm(self.smoothed_direction)
         
-        self.current_gaze_vector = self.smoothed_gaze_vector
+        # Create smoothed ray
+        smoothed_ray = GazeRay(origin=ray.origin, direction=self.smoothed_direction)
+        self.current_ray = smoothed_ray
         
-        # Calculate intersection with screen
-        head_position = debug_info.get('head_position')
-        if head_position is not None:
-            self.current_intersection = self.intersect_with_screen(
-                self.current_gaze_vector, head_position
-            )
+        # Calculate intersection with screen plane
+        if self.is_calibrated:
+            self.current_intersection = self.intersect_ray_with_plane(smoothed_ray)
         
         return True
     
-    def get_screen_coordinates(self, screen_width: int, screen_height: int) -> Optional[Tuple[float, float]]:
+    def get_screen_coordinates(self) -> Optional[Tuple[float, float]]:
         """
-        Convert 3D intersection to 2D screen coordinates.
+        Get normalized screen coordinates from current gaze.
         
-        Args:
-            screen_width: Screen width in pixels
-            screen_height: Screen height in pixels
-            
         Returns:
-            Normalized screen coordinates (x, y) in [0, 1], or None
+            Normalized screen coordinates (u, v) in [0, 1], or None
         """
-        if self.current_intersection is None or not self.is_calibrated:
+        if (not self.is_calibrated or self.current_intersection is None or
+            self.screen_origin is None):
             return None
         
-        # Simple projection: Assume screen is axis-aligned
-        # This will be improved with proper calibration
+        u, v = self.plane_coordinates_to_uv(self.current_intersection)
+        self.last_screen_uv = (u, v)
         
-        # Convert 3D intersection to 2D screen coordinates
-        # For now, use simple linear mapping based on assumption
-        
-        # Intersection point relative to screen center
-        rel_pos = self.current_intersection - self.screen_center
-        
-        # Simple conversion (will be calibrated properly)
-        # Assume screen is 0.4m wide and 0.225m high (16:9 at 60cm)
-        screen_width_m = 0.4
-        screen_height_m = 0.225
-        
-        # Normalized coordinates
-        norm_x = 0.5 + (rel_pos[0] / screen_width_m)
-        norm_y = 0.5 - (rel_pos[1] / screen_height_m)  # Y is inverted
-        
-        # Clamp to [0, 1]
-        norm_x = max(0.0, min(1.0, norm_x))
-        norm_y = max(0.0, min(1.0, norm_y))
-        
-        self.last_screen_point = (norm_x, norm_y)
-        return norm_x, norm_y
+        return u, v
     
     def get_pixel_coordinates(self, screen_width: int, screen_height: int) -> Optional[Tuple[int, int]]:
         """
@@ -364,71 +655,148 @@ class GazeVectorMapper:
         Returns:
             (pixel_x, pixel_y) or None
         """
-        coords = self.get_screen_coordinates(screen_width, screen_height)
+        coords = self.get_screen_coordinates()
         if coords is None:
             return None
         
-        norm_x, norm_y = coords
-        pixel_x = int(norm_x * screen_width)
-        pixel_y = int(norm_y * screen_height)
+        u, v = coords
+        pixel_x = int(u * screen_width)
+        pixel_y = int(v * screen_height)
         
         return pixel_x, pixel_y
+    
+    def _print_calibration_summary(self):
+        """Print calibration summary."""
+        print("\n" + "="*50)
+        print("CALIBRATION SUMMARY")
+        print("="*50)
+        print(f"Plane normal: {self.plane_normal}")
+        print(f"Plane point: {self.plane_point}")
+        print(f"Screen origin: {self.screen_origin}")
+        print(f"U axis: {self.screen_u_axis}")
+        print(f"V axis: {self.screen_v_axis}")
+        print(f"Screen width (scale): {self.screen_width:.3f}")
+        print(f"Screen height (scale): {self.screen_height:.3f}")
+        print(f"Number of samples: {len(self.calibration_samples)}")
+        print("="*50)
     
     def get_status(self) -> Dict[str, Any]:
         """Get current status of the mapper."""
         status = {
             'is_calibrated': self.is_calibrated,
-            'current_gaze_vector': self.current_gaze_vector.tolist() if self.current_gaze_vector is not None else None,
+            'current_ray': {
+                'origin': self.current_ray.origin.tolist() if self.current_ray else None,
+                'direction': self.current_ray.direction.tolist() if self.current_ray else None,
+            },
             'current_intersection': self.current_intersection.tolist() if self.current_intersection is not None else None,
-            'last_screen_point': self.last_screen_point,
-            'screen_normal': self.screen_normal.tolist() if self.screen_normal is not None else None,
-            'screen_center': self.screen_center.tolist() if self.screen_center is not None else None,
+            'last_screen_uv': self.last_screen_uv,
+            'plane_normal': self.plane_normal.tolist() if self.plane_normal is not None else None,
+            'plane_point': self.plane_point.tolist() if self.plane_point is not None else None,
         }
         return status
 
 
-class SimpleGazeVectorCalibrator:
+class GazeVectorCalibrator:
     """
-    Simple calibrator for gaze vector system.
-    Calibrates screen plane using known gaze directions.
+    Calibrator for 3D gaze vector system.
+    
+    Collects calibration samples and calibrates the mapper.
     """
     
     def __init__(self):
-        self.calibration_data = []
+        self.samples: List[CalibrationSample3D] = []
+        self.current_screen_uv = None
     
-    def add_calibration_point(self, gaze_vector: np.ndarray, screen_point: Tuple[float, float]):
-        """Add a calibration point."""
-        self.calibration_data.append((gaze_vector, screen_point))
-        print(f"[Calibrator] Added point {len(self.calibration_data)}: "
-              f"gaze={gaze_vector.tolist()}, screen={screen_point}")
+    def start_point(self, screen_uv: Tuple[float, float]):
+        """
+        Start calibration at a specific screen position.
+        
+        Args:
+            screen_uv: Normalized screen coordinates (u, v) for this point
+        """
+        self.current_screen_uv = screen_uv
+        print(f"[GazeVectorCalibrator] Starting calibration at screen position {screen_uv}")
     
-    def calibrate(self, mapper: GazeVectorMapper) -> bool:
-        """Calibrate the gaze vector mapper."""
-        if len(self.calibration_data) < 3:
-            print("[Calibrator] Need at least 3 points for calibration")
+    def add_sample(self, landmarks_3d: List) -> bool:
+        """
+        Add a calibration sample at current screen position.
+        
+        Args:
+            landmarks_3d: MediaPipe 3D landmarks
+            
+        Returns:
+            True if sample added successfully
+        """
+        if self.current_screen_uv is None:
+            print("[GazeVectorCalibrator] No current screen position set")
             return False
         
-        return mapper.calibrate_screen_plane(self.calibration_data)
+        # Create temporary mapper to calculate ray
+        temp_mapper = GazeVectorMapper()
+        ray = temp_mapper.calculate_gaze_ray(landmarks_3d)
+        
+        if ray is None:
+            return False
+        
+        # Create and store sample
+        sample = CalibrationSample3D(
+            ray=ray,
+            screen_uv=self.current_screen_uv,
+            timestamp=time.time()
+        )
+        
+        self.samples.append(sample)
+        print(f"[GazeVectorCalibrator] Added sample {len(self.samples)}")
+        
+        return True
+    
+    def calibrate(self, mapper: GazeVectorMapper) -> bool:
+        """
+        Calibrate the mapper with collected samples.
+        
+        Args:
+            mapper: GazeVectorMapper to calibrate
+            
+        Returns:
+            True if calibration successful
+        """
+        if len(self.samples) < 4:
+            print(f"[GazeVectorCalibrator] Need at least 4 samples, have {len(self.samples)}")
+            return False
+        
+        return mapper.calibrate_from_samples(self.samples)
+    
+    def reset(self):
+        """Reset calibrator for new session."""
+        self.samples = []
+        self.current_screen_uv = None
+        print("[GazeVectorCalibrator] Reset")
 
 
-# Simple test
+# Test function
 def test_gaze_vectors():
     """Test the gaze vector calculation."""
     print("Testing Gaze Vector Mapper...")
     
-    # Test with dummy data
+    # Test with default initialization
     mapper = GazeVectorMapper()
     
-    print(f"Screen normal: {mapper.screen_normal}")
-    print(f"Screen center: {mapper.screen_center}")
+    print(f"Plane normal: {mapper.plane_normal}")
+    print(f"Plane point: {mapper.plane_point}")
     print(f"Is calibrated: {mapper.is_calibrated}")
     
-    # Test intersection
-    test_gaze = np.array([0, 0, -1])  # Looking straight
-    test_head = np.array([0, 0, 0])   # Head at origin
+    # Test with dummy ray
+    test_ray = GazeRay(
+        origin=np.array([0, 0, 0]),
+        direction=np.array([0, 0, -1])
+    )
     
-    intersection = mapper.intersect_with_screen(test_gaze, test_head)
+    intersection = mapper.intersect_ray_with_plane(test_ray)
     print(f"Test intersection: {intersection}")
+    
+    if intersection is not None:
+        uv = mapper.plane_coordinates_to_uv(intersection)
+        print(f"Test screen coordinates: {uv}")
 
 
 if __name__ == "__main__":
