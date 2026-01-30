@@ -255,6 +255,7 @@ while cap.isOpened():
         cv2.line(landmarks_frame, project(avg_origin), project(ray_end), (15, 255, 0), 3)
 
     cv2.imshow("Head-Aligned Cube", frame)
+    cv2.imshow("Facial Landmarks", landmarks_frame)
 
     if keyboard.is_pressed('f7'):
         mouse_control_enabled = not mouse_control_enabled

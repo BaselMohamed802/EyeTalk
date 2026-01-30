@@ -1,38 +1,26 @@
 """
-Filename: head_tracking_app.py
-Creator/Author: Basel Mohamed Mostafa Sayed
+Filename: head_tracking_mouse.py
+Creator/Author: Your Name
 Date: [Current Date]
 
 Description:
-    Head tracking mouse control - simplified version based on original code.
+    Head tracking mouse control system using custom modules.
+    Recreates the exact functionality of the original code.
 """
 
 import cv2
 import numpy as np
-import math
-import keyboard
 import time
-import pyautogui
-import threading
+import keyboard
 from collections import deque
-from VisionModule.camera import IrisCamera
+
+# Import your modules
+from VisionModule.camera import IrisCamera, print_camera_info
 from VisionModule.face_utils import FaceMeshDetector
+from VisionModule.head_tracking import HeadTracker
+from PyautoguiController.mouse_controller import MouseController
 
-# Disable fail-safe for now
-pyautogui.FAILSAFE = False
-
-# Get screen info
-MONITOR_WIDTH, MONITOR_HEIGHT = pyautogui.size()
-CENTER_X = MONITOR_WIDTH // 2
-CENTER_Y = MONITOR_HEIGHT // 2
-
-# Mouse control thread
-mouse_target = [CENTER_X, CENTER_Y]
-mouse_lock = threading.Lock()
-mouse_enabled = True
-filter_length = 8
-
-# Face outline indices for drawing
+# Constants from original code
 FACE_OUTLINE_INDICES = [
     10, 338, 297, 332, 284, 251, 389, 356,
     454, 323, 361, 288, 397, 365, 379, 378,
@@ -41,45 +29,41 @@ FACE_OUTLINE_INDICES = [
     54, 103, 67, 109
 ]
 
-# Key landmark indices
-LANDMARKS = {
-    "left": 234,
-    "right": 454,
-    "top": 10,
-    "bottom": 152,
-    "front": 1,
-}
-
-# Calibration
-calibration_offset_yaw = 0
-calibration_offset_pitch = 0
-
-# Smoothing buffers
-ray_origins = deque(maxlen=filter_length)
-ray_directions = deque(maxlen=filter_length)
-
-def mouse_mover():
-    """Thread for moving mouse cursor."""
-    while True:
-        if mouse_enabled:
-            with mouse_lock:
-                x, y = mouse_target
-            pyautogui.moveTo(x, y)
-        time.sleep(0.01)
-
-def landmark_to_np(landmark, w, h):
-    """Convert MediaPipe landmark to numpy array."""
-    return np.array([landmark.x * w, landmark.y * h, landmark.z * w])
+# Head tracking parameters (from original code)
+YAW_RANGE = 20  # degrees
+PITCH_RANGE = 10  # degrees
+FILTER_LENGTH = 8
 
 def main():
-    global mouse_target, mouse_enabled, calibration_offset_yaw, calibration_offset_pitch
+    print("Head Tracking Mouse Control System")
+    print("==================================")
     
-    print("Starting Head Tracking Mouse Control...")
-    print(f"Screen: {MONITOR_WIDTH}x{MONITOR_HEIGHT}")
-    print("Controls: F7=toggle mouse, C=calibrate, Q=quit")
+    # 1. List available cameras
+    print("\nScanning for cameras...")
+    cameras = print_camera_info()
+    
+    if not cameras:
+        print("No cameras found. Please connect a camera and try again.")
+        return
+    
+    # 2. Select camera
+    camera_ports = list(cameras.keys())
+    if len(camera_ports) > 1:
+        print(f"\nAvailable cameras: {camera_ports}")
+        cam_id = int(input(f"Select camera port (default {camera_ports[0]}): ") or camera_ports[0])
+    else:
+        cam_id = camera_ports[0]
+        print(f"\nUsing camera at port {cam_id}")
+    
+    # 3. Initialize components
+    print("\nInitializing components...")
     
     # Initialize camera
-    camera = IrisCamera(1, 640, 480)
+    try:
+        camera = IrisCamera(cam_id, cam_width=640, cam_height=480)
+    except Exception as e:
+        print(f"Error initializing camera: {e}")
+        return
     
     # Initialize face mesh detector
     face_detector = FaceMeshDetector(
@@ -90,237 +74,204 @@ def main():
         min_tracking_confidence=0.5
     )
     
-    # Start mouse thread
-    mouse_thread = threading.Thread(target=mouse_mover, daemon=True)
-    mouse_thread.start()
+    # Initialize head tracker
+    head_tracker = HeadTracker(filter_length=FILTER_LENGTH)
     
-    # Main loop
-    frame_count = 0
+    # Initialize mouse controller
+    mouse_controller = MouseController(update_interval=0.01, enable_failsafe=False)
+    mouse_controller.start()
     
-    while camera.is_opened():
-        # Get frame
-        frame = camera.get_frame()
-        if frame is None:
-            continue
-        
-        frame_count += 1
-        h, w = frame.shape[:2]
-        
-        # Convert to RGB for MediaPipe
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = face_detector.face_mesh.process(rgb)
-        
-        if results.multi_face_landmarks:
-            face_landmarks = results.multi_face_landmarks[0].landmark
+    print("\nControls:")
+    print("  F7: Toggle mouse control")
+    print("  C: Calibrate (set current head position as center)")
+    print("  Q: Quit")
+    print("\nStarting tracking...")
+    
+    # Mouse control state
+    mouse_control_enabled = True
+    
+    # For storing raw angles before calibration
+    raw_yaw = 0
+    raw_pitch = 0
+    
+    try:
+        while camera.is_opened():
+            # Get frame
+            frame = camera.get_frame()
+            if frame is None:
+                continue
             
-            # Create blank frame for landmarks
-            landmarks_frame = np.zeros_like(frame)
+            # Get camera resolution
+            cam_width, cam_height = camera.get_resolution()
             
-            # Draw all landmarks
-            for i, landmark in enumerate(face_landmarks):
-                pt = landmark_to_np(landmark, w, h)
-                x, y = int(pt[0]), int(pt[1])
-                if 0 <= x < w and 0 <= y < h:
-                    color = (155, 155, 155) if i in FACE_OUTLINE_INDICES else (255, 25, 10)
+            # Get face landmarks with 3D coordinates
+            landmarks_frame, landmarks_list_3d = face_detector.get_landmarks_as_pixels(frame)
+            
+            if landmarks_list_3d:
+                # Convert landmarks to dictionary for easier access
+                landmarks_dict = {}
+                for idx, x, y, z in landmarks_list_3d:
+                    landmarks_dict[idx] = (x, y, z)
+                
+                # Create landmark visualization (like original code)
+                for idx, x, y, z in landmarks_list_3d:
+                    # Color coding like original code
+                    if idx in FACE_OUTLINE_INDICES:
+                        color = (155, 155, 155)  # Gray for outline
+                    else:
+                        color = (255, 25, 10)    # Red for other landmarks
+                    
                     cv2.circle(landmarks_frame, (x, y), 3, color, -1)
+                    cv2.circle(frame, (x, y), 1, (255, 255, 255), -1)
+                
+                # Get key points for head tracking
+                key_points_indices = {
+                    "left": 234,
+                    "right": 454,
+                    "top": 10,
+                    "bottom": 152,
+                    "front": 1
+                }
+                
+                # Check if we have all required key points
+                missing_points = [name for name, idx in key_points_indices.items() 
+                                if idx not in landmarks_dict]
+                
+                if not missing_points:
+                    # Extract key points with 3D coordinates
+                    key_points_3d = {}
+                    for name, idx in key_points_indices.items():
+                        x, y, z = landmarks_dict[idx]
+                        key_points_3d[name] = np.array([float(x), float(y), float(z)])
+                    
+                    # Calculate head orientation
+                    orientation = head_tracker.calculate_head_orientation(key_points_3d)
+                    
+                    # Update smoothing buffers
+                    head_tracker.update_smoothing_buffers(
+                        orientation['center'],
+                        orientation['forward_axis']
+                    )
+                    
+                    # Get smoothed orientation
+                    smoothed_origin, smoothed_direction = head_tracker.get_smoothed_orientation()
+                    
+                    # Calculate angles
+                    yaw_deg, pitch_deg = head_tracker.calculate_yaw_pitch(smoothed_direction)
+                    
+                    # DEBUG: Print raw angles
+                    # print(f"Raw angles: yaw={yaw_deg:.1f}, pitch={pitch_deg:.1f}")
+                    
+                    # Convert to 360-degree range
+                    yaw_360, pitch_360 = head_tracker.convert_angles_to_360(yaw_deg, pitch_deg)
+                    
+                    # Store raw angles for calibration
+                    raw_yaw = yaw_360
+                    raw_pitch = pitch_360
+                    
+                    # DEBUG: Print converted angles
+                    # print(f"Converted: yaw={yaw_360:.1f}, pitch={pitch_360:.1f}")
+                    
+                    # Map to screen coordinates
+                    screen_width, screen_height = mouse_controller.get_screen_size()
+                    screen_x, screen_y = head_tracker.map_to_screen(
+                        yaw_360, pitch_360, 
+                        screen_width, screen_height,
+                        YAW_RANGE, PITCH_RANGE
+                    )
+                    
+                    # DEBUG: Print screen coordinates
+                    # print(f"Screen before clamp: ({screen_x}, {screen_y})")
+                    
+                    # Clamp to screen
+                    screen_x, screen_y = head_tracker.clamp_to_screen(
+                        screen_x, screen_y, screen_width, screen_height
+                    )
+                    
+                    # DEBUG: Print final coordinates
+                    # print(f"Screen final: ({screen_x}, {screen_y})")
+                    
+                    # Update mouse position if enabled
+                    if mouse_control_enabled:
+                        mouse_controller.set_target(screen_x, screen_y)
+                    
+                    # Generate and draw head cube
+                    cube_corners = head_tracker.generate_head_cube(
+                        orientation['center'],
+                        orientation['right_axis'],
+                        orientation['up_axis'],
+                        orientation['forward_axis'],
+                        orientation['half_width'],
+                        orientation['half_height']
+                    )
+                    
+                    # Draw cube on frame
+                    face_detector.draw_head_cube(frame, cube_corners)
+                    
+                    # Draw gaze ray (convert 3D to 2D for drawing)
+                    ray_origin_2d = smoothed_origin[:2]  # Just x, y
+                    ray_dir_2d = smoothed_direction[:2]  # Just x, y
+                    
+                    # Normalize 2D direction for consistent ray length
+                    ray_dir_2d_norm = np.linalg.norm(ray_dir_2d)
+                    if ray_dir_2d_norm > 0:
+                        ray_dir_2d = ray_dir_2d / ray_dir_2d_norm
+                    
+                    # Draw on both frames
+                    face_detector.draw_simple_gaze_ray(frame, ray_origin_2d, ray_dir_2d, length=200)
+                    face_detector.draw_simple_gaze_ray(landmarks_frame, ray_origin_2d, ray_dir_2d, length=200)
+                    
+                    # Draw key points in pink (like original code)
+                    for name, idx in key_points_indices.items():
+                        if idx in landmarks_dict:
+                            x, y, z = landmarks_dict[idx]
+                            cv2.circle(frame, (x, y), 4, (0, 0, 0), -1)  # Black border
+                            cv2.circle(frame, (x, y), 3, (255, 0, 255), -1)  # Pink center
+                    
+                    # Display info
+                    cv2.putText(frame, f"Yaw: {yaw_360:.1f}°, Pitch: {pitch_360:.1f}°", 
+                               (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    cv2.putText(frame, f"Mouse: {'ON' if mouse_control_enabled else 'OFF'}", 
+                               (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, 
+                               (0, 255, 0) if mouse_control_enabled else (0, 0, 255), 2)
+                    cv2.putText(frame, f"Screen: ({screen_x}, {screen_y})", 
+                               (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             
-            # Extract key points
-            key_points = {}
-            for name, idx in LANDMARKS.items():
-                pt = landmark_to_np(face_landmarks[idx], w, h)
-                key_points[name] = pt
-                x, y = int(pt[0]), int(pt[1])
-                cv2.circle(frame, (x, y), 4, (0, 0, 0), -1)
+            # Show FPS
+            fps = camera.get_frame_rate()
+            cv2.putText(frame, f"FPS: {fps}", (10, cam_height - 10), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
             
-            # Get points
-            left = key_points["left"]
-            right = key_points["right"]
-            top = key_points["top"]
-            bottom = key_points["bottom"]
-            front = key_points["front"]
+            # Display windows
+            cv2.imshow("Head Tracking Mouse Control", frame)
+            cv2.imshow("Facial Landmarks", landmarks_frame)
             
-            # Calculate axes
-            right_axis = (right - left)
-            right_norm = np.linalg.norm(right_axis)
-            if right_norm > 0:
-                right_axis = right_axis / right_norm
+            # Handle keyboard input
+            if keyboard.is_pressed('f7'):
+                mouse_control_enabled = not mouse_control_enabled
+                status = "Enabled" if mouse_control_enabled else "Disabled"
+                print(f"[Mouse Control] {status}")
+                time.sleep(0.3)  # Debounce
             
-            up_axis = (top - bottom)
-            up_norm = np.linalg.norm(up_axis)
-            if up_norm > 0:
-                up_axis = up_axis / up_norm
+            if keyboard.is_pressed('c'):
+                head_tracker.calibrate(raw_yaw, raw_pitch)
+                time.sleep(0.3)  # Debounce
             
-            # Forward axis
-            forward_axis = np.cross(right_axis, up_axis)
-            forward_norm = np.linalg.norm(forward_axis)
-            if forward_norm > 0:
-                forward_axis = forward_axis / forward_norm
-            
-            forward_axis = -forward_axis  # Flip to face forward
-            
-            # Center
-            center = (left + right + top + bottom + front) / 5.0
-            
-            # Update smoothing buffers
-            ray_origins.append(center)
-            ray_directions.append(forward_axis)
-            
-            # Get smoothed values
-            if ray_origins:
-                avg_origin = np.mean(list(ray_origins), axis=0)
-                avg_direction = np.mean(list(ray_directions), axis=0)
-                avg_norm = np.linalg.norm(avg_direction)
-                if avg_norm > 0:
-                    avg_direction = avg_direction / avg_norm
-            
-            # Calculate angles
-            reference_forward = np.array([0, 0, -1])
-            
-            # Yaw
-            xz_proj = np.array([avg_direction[0], 0, avg_direction[2]])
-            if np.linalg.norm(xz_proj) > 0:
-                xz_proj = xz_proj / np.linalg.norm(xz_proj)
-                yaw_rad = math.acos(np.clip(np.dot(reference_forward, xz_proj), -1.0, 1.0))
-                if avg_direction[0] < 0:
-                    yaw_rad = -yaw_rad
-            else:
-                yaw_rad = 0
-            
-            # Pitch
-            yz_proj = np.array([0, avg_direction[1], avg_direction[2]])
-            if np.linalg.norm(yz_proj) > 0:
-                yz_proj = yz_proj / np.linalg.norm(yz_proj)
-                pitch_rad = math.acos(np.clip(np.dot(reference_forward, yz_proj), -1.0, 1.0))
-                if avg_direction[1] > 0:
-                    pitch_rad = -pitch_rad
-            else:
-                pitch_rad = 0
-            
-            # Convert to degrees
-            yaw_deg = math.degrees(yaw_rad)
-            pitch_deg = math.degrees(pitch_rad)
-            
-            # Convert to 0-360 range
-            if yaw_deg < 0:
-                yaw_deg = abs(yaw_deg)
-            elif yaw_deg < 180:
-                yaw_deg = 360 - yaw_deg
-            
-            if pitch_deg < 0:
-                pitch_deg = 360 + pitch_deg
-            
-            raw_yaw_deg = yaw_deg
-            raw_pitch_deg = pitch_deg
-            
-            # Apply calibration
-            yaw_deg += calibration_offset_yaw
-            pitch_deg += calibration_offset_pitch
-            
-            # Map to screen
-            yawDegrees = 20
-            pitchDegrees = 10
-            
-            screen_x = int(((yaw_deg - (180 - yawDegrees)) / (2 * yawDegrees)) * MONITOR_WIDTH)
-            screen_y = int(((180 + pitchDegrees - pitch_deg) / (2 * pitchDegrees)) * MONITOR_HEIGHT)
-            
-            # Clamp to screen
-            screen_x = max(10, min(screen_x, MONITOR_WIDTH - 10))
-            screen_y = max(10, min(screen_y, MONITOR_HEIGHT - 10))
-            
-            # Update mouse target
-            if mouse_enabled and frame_count > 5:
-                with mouse_lock:
-                    mouse_target[0] = screen_x
-                    mouse_target[1] = screen_y
-            
-            # Draw head cube
-            half_width = np.linalg.norm(right - left) / 2
-            half_height = np.linalg.norm(top - bottom) / 2
-            depth = 80
-            
-            # Generate cube corners
-            def corner(x_sign, y_sign, z_sign):
-                return (center + 
-                        x_sign * half_width * right_axis +
-                        y_sign * half_height * up_axis +
-                        z_sign * depth * forward_axis)
-            
-            cube_corners = [
-                corner(-1, 1, -1), corner(1, 1, -1),
-                corner(1, -1, -1), corner(-1, -1, -1),
-                corner(-1, 1, 1), corner(1, 1, 1),
-                corner(1, -1, 1), corner(-1, -1, 1)
-            ]
-            
-            # Draw cube wireframe
-            edges = [
-                (0, 1), (1, 2), (2, 3), (3, 0),
-                (4, 5), (5, 6), (6, 7), (7, 4),
-                (0, 4), (1, 5), (2, 6), (3, 7)
-            ]
-            
-            for i, j in edges:
-                start = (int(cube_corners[i][0]), int(cube_corners[i][1]))
-                end = (int(cube_corners[j][0]), int(cube_corners[j][1]))
-                cv2.line(frame, start, end, (255, 125, 35), 2)
-            
-            # Draw gaze ray
-            ray_length = 2.5 * depth
-            ray_end = avg_origin - avg_direction * ray_length
-            cv2.line(frame, 
-                    (int(avg_origin[0]), int(avg_origin[1])),
-                    (int(ray_end[0]), int(ray_end[1])),
-                    (15, 255, 0), 3)
-            
-            # Draw gaze ray on landmarks frame too
-            cv2.line(landmarks_frame,
-                    (int(avg_origin[0]), int(avg_origin[1])),
-                    (int(ray_end[0]), int(ray_end[1])),
-                    (15, 255, 0), 3)
-            
-            # Display info
-            cv2.putText(frame, f"Yaw: {yaw_deg:.1f}°, Pitch: {pitch_deg:.1f}°",
-                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-            cv2.putText(frame, f"Mouse: {screen_x}, {screen_y}",
-                       (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-        
-        # Display mouse status
-        status = "ON" if mouse_enabled else "OFF"
-        color = (0, 255, 0) if mouse_enabled else (0, 0, 255)
-        cv2.putText(frame, f"Mouse: {status}", 
-                   (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-        
-        # Display FPS
-        fps = camera.get_frame_rate()
-        cv2.putText(frame, f"FPS: {fps}", 
-                   (frame.shape[1] - 100, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
-        
-        # Show frames
-        cv2.imshow("Head Tracking", frame)
-        cv2.imshow("Facial Landmarks", landmarks_frame)
-        
-        # Handle keys
-        key = cv2.waitKey(1) & 0xFF
-        
-        if keyboard.is_pressed('f7'):
-            mouse_enabled = not mouse_enabled
-            print(f"Mouse control: {'ENABLED' if mouse_enabled else 'DISABLED'}")
-            time.sleep(0.3)
-        
-        elif key == ord('c'):
-            calibration_offset_yaw = 180 - raw_yaw_deg
-            calibration_offset_pitch = 180 - raw_pitch_deg
-            print(f"Calibrated: Yaw offset={calibration_offset_yaw:.1f}, Pitch offset={calibration_offset_pitch:.1f}")
-        
-        elif key == ord('q'):
-            break
+            # Check for 'q' key or window close
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q') or cv2.getWindowProperty("Head Tracking Mouse Control", cv2.WND_PROP_VISIBLE) < 1:
+                break
     
-    # Cleanup
-    print("Cleaning up...")
-    face_detector.release()
-    camera.stop_recording()
-    cv2.destroyAllWindows()
-    print("Application closed")
+    except KeyboardInterrupt:
+        print("\nInterrupted by user")
+    finally:
+        # Cleanup
+        print("\nShutting down...")
+        camera.stop_recording()
+        face_detector.release()
+        mouse_controller.stop()
+        cv2.destroyAllWindows()
+        print("Cleanup complete.")
 
 if __name__ == "__main__":
     main()

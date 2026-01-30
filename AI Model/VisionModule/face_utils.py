@@ -437,6 +437,53 @@ class FaceMeshDetector:
                 outline_points.append((x, y))
         
         return outline_points
+    
+    def draw_simple_gaze_ray(self, img, origin_2d, direction_2d, length=200, color=(15, 255, 0)):
+        """Draw a gaze direction ray from 2D points."""
+        if origin_2d is None or direction_2d is None:
+            return img
+        
+        # Calculate end point
+        end_x = int(origin_2d[0] - direction_2d[0] * length)
+        end_y = int(origin_2d[1] - direction_2d[1] * length)
+        
+        # Draw ray
+        cv2.line(img, 
+                (int(origin_2d[0]), int(origin_2d[1])),
+                (end_x, end_y), 
+                color, 3)
+        
+        return img
+
+    def get_landmarks_as_pixels(self, img):
+        """
+        Get all landmarks as individual pixels with 3D coordinates.
+        
+        Args:
+            img: Input image
+            
+        Returns:
+            tuple: (landmarks_frame, landmarks_list_3d) 
+        """
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        self.results = self.face_mesh.process(img_rgb)
+        
+        landmarks_frame = np.zeros_like(img)  # Black frame
+        landmarks_list_3d = []  # List of (idx, x, y, z)
+        
+        if self.results.multi_face_landmarks:
+            face_landmarks = self.results.multi_face_landmarks[0]
+            img_height, img_width, _ = img.shape
+            
+            for i, landmark in enumerate(face_landmarks.landmark):
+                x = int(landmark.x * img_width)
+                y = int(landmark.y * img_height)
+                z = landmark.z * img_width  # Scale z by width
+                
+                if 0 <= x < img_width and 0 <= y < img_height:
+                    landmarks_list_3d.append((i, x, y, z))
+        
+        return landmarks_frame, landmarks_list_3d
 
     def release(self):
         """

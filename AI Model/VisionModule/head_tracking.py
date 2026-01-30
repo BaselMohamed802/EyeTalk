@@ -44,24 +44,29 @@ class HeadTracker:
         
         return key_points
     
-    def calculate_head_orientation(self, key_points):
-        """Calculate head orientation from key points."""
-        # Get points
-        left = np.array(key_points["left"], dtype=float)
-        right = np.array(key_points["right"], dtype=float)
-        top = np.array(key_points["top"], dtype=float)
-        bottom = np.array(key_points["bottom"], dtype=float)
-        front = np.array(key_points["front"], dtype=float)
+    def calculate_head_orientation(self, key_points_3d):
+        """Calculate head orientation from 3D key points."""
+        # Convert to numpy arrays
+        left = np.array(key_points_3d["left"], dtype=float)
+        right = np.array(key_points_3d["right"], dtype=float)
+        top = np.array(key_points_3d["top"], dtype=float)
+        bottom = np.array(key_points_3d["bottom"], dtype=float)
+        front = np.array(key_points_3d["front"], dtype=float)
         
-        # Calculate width and height
-        width = np.linalg.norm(right - left)
-        height = np.linalg.norm(top - bottom)
+        # Calculate axes
+        right_axis = right - left
+        up_axis = top - bottom
         
-        # Calculate axes (normalized)
-        right_axis = (right - left) / width if width > 0 else np.array([1.0, 0.0, 0.0])
-        up_axis = (top - bottom) / height if height > 0 else np.array([0.0, 1.0, 0.0])
+        # Normalize axes
+        right_norm = np.linalg.norm(right_axis)
+        up_norm = np.linalg.norm(up_axis)
         
-        # Forward axis (cross product, normalized)
+        if right_norm > 0:
+            right_axis = right_axis / right_norm
+        if up_norm > 0:
+            up_axis = up_axis / up_norm
+        
+        # Forward axis (cross product)
         forward_axis = np.cross(right_axis, up_axis)
         forward_norm = np.linalg.norm(forward_axis)
         if forward_norm > 0:
@@ -73,13 +78,17 @@ class HeadTracker:
         # Center of head
         center = (left + right + top + bottom + front) / 5.0
         
+        # Half sizes
+        half_width = np.linalg.norm(right - left) / 2.0
+        half_height = np.linalg.norm(top - bottom) / 2.0
+        
         return {
             'right_axis': right_axis,
             'up_axis': up_axis,
             'forward_axis': forward_axis,
             'center': center,
-            'half_width': width / 2.0,
-            'half_height': height / 2.0
+            'half_width': half_width,
+            'half_height': half_height
         }
     
     def update_smoothing_buffers(self, center, forward_axis):
@@ -133,20 +142,40 @@ class HeadTracker:
         return math.degrees(yaw_rad), math.degrees(pitch_rad)
     
     def convert_angles_to_360(self, yaw_deg, pitch_deg):
-        """Convert angles to 0-360 range."""
-        # Yaw: 90° = left, 180° = center, 270° = right
+        """Convert angles to 0-360 range (EXACTLY like original code)."""
+        # Yaw conversion (same as original)
         if yaw_deg < 0:
-            yaw_360 = abs(yaw_deg)
+            yaw_360 = abs(yaw_deg)  # Negative to positive
+        elif yaw_deg < 180:
+            yaw_360 = 360 - yaw_deg  # Small positive to large
         else:
-            yaw_360 = 360 - yaw_deg if yaw_deg < 180 else 180
+            yaw_360 = yaw_deg  # Already in correct range
         
-        # Pitch: 90° = down, 180° = center, 270° = up
+        # Pitch conversion (same as original)
         if pitch_deg < 0:
             pitch_360 = 360 + pitch_deg
         else:
             pitch_360 = pitch_deg
         
         return yaw_360, pitch_360
+    
+    def landmark_to_np(self, landmark, img_width, img_height):
+        """
+        Convert MediaPipe landmark to numpy array.
+        
+        Args:
+            landmark: MediaPipe landmark object
+            img_width: Image width
+            img_height: Image height
+            
+        Returns:
+            np.array: [x, y, z] coordinates
+        """
+        return np.array([
+            landmark.x * img_width,
+            landmark.y * img_height,
+            landmark.z * img_width  # Using width as scale for z
+        ])
     
     def map_to_screen(self, yaw_deg, pitch_deg, screen_width, screen_height, 
                      yaw_range=20, pitch_range=10):
