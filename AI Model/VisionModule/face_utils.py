@@ -15,6 +15,7 @@ Description:
 import cv2
 import mediapipe as mp
 import numpy as np
+from head_tracking import HeadTracker
 
 # Face Detection Class
 class FaceDetector():
@@ -323,6 +324,144 @@ class FaceMeshDetector:
         
         return img
     
+    def get_head_key_points(self, img):
+            """
+            Extract key points for head tracking from the given image.
+            
+            Args:
+                img: A 3-channel color image
+                
+            Returns:
+                Dictionary with key head points and their 3D coordinates
+            """
+            # Define key landmark indices for head tracking
+            HEAD_KEY_POINTS = {
+                "left": 234,     # Left temple
+                "right": 454,    # Right temple
+                "top": 10,       # Forehead top
+                "bottom": 152,   # Chin bottom
+                "front": 1,      # Nose tip
+                "nose_bridge": 168,  # Nose bridge
+                "left_eye_outer": 33,   # Left eye outer corner
+                "right_eye_outer": 263, # Right eye outer corner
+                "left_eye_inner": 133,  # Left eye inner corner
+                "right_eye_inner": 362, # Right eye inner corner
+            }
+            
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            self.results = self.face_mesh.process(img_rgb)
+            
+            key_points = {}
+            if self.results.multi_face_landmarks:
+                face_landmarks = self.results.multi_face_landmarks[0]
+                img_height, img_width, _ = img.shape
+                
+                for name, idx in HEAD_KEY_POINTS.items():
+                    landmark = face_landmarks.landmark[idx]
+                    # Convert to 3D point (z coordinate from landmark.z)
+                    key_points[name] = np.array([
+                        landmark.x * img_width,
+                        landmark.y * img_height,
+                        landmark.z * img_width  # Using width as z scale
+                    ])
+            
+            return key_points
+    
+    def draw_head_cube(self, img, cube_corners, edges=None):
+        """
+        Draw a 3D cube representing head orientation.
+        
+        Args:
+            img: Input image
+            cube_corners: List of 8 cube corner points as numpy arrays
+            edges: List of edge connections (optional, uses default if None)
+            
+        Returns:
+            Image with cube drawn
+        """
+        if edges is None:
+            edges = [
+                (0, 1), (1, 2), (2, 3), (3, 0),  # front face
+                (4, 5), (5, 6), (6, 7), (7, 4),  # back face
+                (0, 4), (1, 5), (2, 6), (3, 7)   # sides
+            ]
+        
+        # Convert 3D points to 2D for drawing
+        cube_2d = [HeadTracker.project_to_2d(pt) for pt in cube_corners]
+        
+        # Draw edges
+        for i, j in edges:
+            cv2.line(img, cube_2d[i], cube_2d[j], (255, 125, 35), 2)
+        
+        # Draw corners
+        for pt in cube_2d:
+            cv2.circle(img, pt, 3, (0, 255, 255), -1)
+        
+        return img
+    
+    def draw_gaze_ray(self, img, origin, direction, length=200, color=(15, 255, 0)):
+        """
+        Draw a gaze direction ray from head center.
+        
+        Args:
+            img: Input image
+            origin: Ray origin point (3D)
+            direction: Ray direction vector (3D)
+            length: Ray length in pixels
+            color: Ray color in BGR
+            
+        Returns:
+            Image with ray drawn
+        """
+        # Calculate ray end point
+        end_point = origin - direction * length
+        
+        # Convert to 2D
+        start_2d = HeadTracker.project_to_2d(origin)
+        end_2d = HeadTracker.project_to_2d(end_point)
+        
+        # Draw ray
+        cv2.line(img, start_2d, end_2d, color, 3)
+        
+        # Draw origin point
+        cv2.circle(img, start_2d, 5, (0, 0, 255), -1)
+        
+        return img
+    
+    def get_face_outline_points(self, img):
+        """
+        Get face outline points for visualization.
+        
+        Args:
+            img: Input image
+            
+        Returns:
+            List of (x, y) points for face outline
+        """
+        FACE_OUTLINE_INDICES = [
+            10, 338, 297, 332, 284, 251, 389, 356,
+            454, 323, 361, 288, 397, 365, 379, 378,
+            400, 377, 152, 148, 176, 149, 150, 136,
+            172, 58, 132, 93, 234, 127, 162, 21,
+            54, 103, 67, 109
+        ]
+        
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        self.results = self.face_mesh.process(img_rgb)
+        
+        outline_points = []
+        if self.results.multi_face_landmarks:
+            face_landmarks = self.results.multi_face_landmarks[0]
+            img_height, img_width, _ = img.shape
+            
+            for idx in FACE_OUTLINE_INDICES:
+                landmark = face_landmarks.landmark[idx]
+                x = int(landmark.x * img_width)
+                y = int(landmark.y * img_height)
+                outline_points.append((x, y))
+        
+        return outline_points
+
     def release(self):
         """
         Release the FaceMesh object resources.
