@@ -15,7 +15,6 @@ Description:
 import cv2
 import mediapipe as mp
 import numpy as np
-from head_tracking import HeadTracker
 
 # Face Detection Class
 class FaceDetector():
@@ -368,17 +367,7 @@ class FaceMeshDetector:
             return key_points
     
     def draw_head_cube(self, img, cube_corners, edges=None):
-        """
-        Draw a 3D cube representing head orientation.
-        
-        Args:
-            img: Input image
-            cube_corners: List of 8 cube corner points as numpy arrays
-            edges: List of edge connections (optional, uses default if None)
-            
-        Returns:
-            Image with cube drawn
-        """
+        """Draw a 3D cube on the image."""
         if edges is None:
             edges = [
                 (0, 1), (1, 2), (2, 3), (3, 0),  # front face
@@ -386,45 +375,32 @@ class FaceMeshDetector:
                 (0, 4), (1, 5), (2, 6), (3, 7)   # sides
             ]
         
-        # Convert 3D points to 2D for drawing
-        cube_2d = [HeadTracker.project_to_2d(pt) for pt in cube_corners]
+        # Convert 3D points to 2D (ignore Z coordinate)
+        cube_2d = []
+        for pt in cube_corners:
+            x = int(pt[0])
+            y = int(pt[1])
+            cube_2d.append((x, y))
         
         # Draw edges
         for i, j in edges:
             cv2.line(img, cube_2d[i], cube_2d[j], (255, 125, 35), 2)
         
-        # Draw corners
-        for pt in cube_2d:
-            cv2.circle(img, pt, 3, (0, 255, 255), -1)
-        
         return img
-    
+
     def draw_gaze_ray(self, img, origin, direction, length=200, color=(15, 255, 0)):
-        """
-        Draw a gaze direction ray from head center.
-        
-        Args:
-            img: Input image
-            origin: Ray origin point (3D)
-            direction: Ray direction vector (3D)
-            length: Ray length in pixels
-            color: Ray color in BGR
-            
-        Returns:
-            Image with ray drawn
-        """
-        # Calculate ray end point
+        """Draw a gaze direction ray."""
+        # Calculate end point
         end_point = origin - direction * length
         
         # Convert to 2D
-        start_2d = HeadTracker.project_to_2d(origin)
-        end_2d = HeadTracker.project_to_2d(end_point)
+        start_x = int(origin[0])
+        start_y = int(origin[1])
+        end_x = int(end_point[0])
+        end_y = int(end_point[1])
         
         # Draw ray
-        cv2.line(img, start_2d, end_2d, color, 3)
-        
-        # Draw origin point
-        cv2.circle(img, start_2d, 5, (0, 0, 255), -1)
+        cv2.line(img, (start_x, start_y), (end_x, end_y), color, 3)
         
         return img
     

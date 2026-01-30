@@ -10,15 +10,16 @@ Description:
 import pyautogui
 import threading
 import time
-from typing import Tuple, Optional
+from typing import Tuple
 
 class MouseController:
-    def __init__(self, update_interval: float = 0.01):
+    def __init__(self, update_interval: float = 0.01, enable_failsafe: bool = False):
         """
         Initialize threaded mouse controller.
         
         Args:
             update_interval: Time between mouse updates in seconds
+            enable_failsafe: Whether to enable PyAutoGUI's fail-safe feature
         """
         self.update_interval = update_interval
         self.mouse_target = [0, 0]
@@ -29,6 +30,14 @@ class MouseController:
         
         # Get screen size
         self.screen_width, self.screen_height = pyautogui.size()
+        
+        # Set fail-safe
+        pyautogui.FAILSAFE = enable_failsafe
+        
+        # Initialize mouse to center of screen
+        center_x = self.screen_width // 2
+        center_y = self.screen_height // 2
+        self.set_target(center_x, center_y)
     
     def start(self):
         """Start the mouse control thread."""
@@ -50,7 +59,12 @@ class MouseController:
                 with self.mouse_lock:
                     x, y = self.mouse_target
                 # Move mouse
-                pyautogui.moveTo(x, y)
+                try:
+                    pyautogui.moveTo(x, y)
+                except pyautogui.FailSafeException:
+                    # Handle fail-safe exception gracefully
+                    print("[WARNING] Fail-safe triggered. Mouse control paused.")
+                    time.sleep(1)  # Wait before resuming
             time.sleep(self.update_interval)
     
     def set_target(self, x: int, y: int):
@@ -61,9 +75,10 @@ class MouseController:
             x: X coordinate
             y: Y coordinate
         """
-        # Clamp to screen bounds
-        x = max(0, min(x, self.screen_width - 1))
-        y = max(0, min(y, self.screen_height - 1))
+        # Clamp to screen bounds with margin
+        margin = 10
+        x = max(margin, min(x, self.screen_width - margin))
+        y = max(margin, min(y, self.screen_height - margin))
         
         with self.mouse_lock:
             self.mouse_target[0] = x
