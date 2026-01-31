@@ -1,7 +1,7 @@
 """
-Filename: head_tracking_mouse.py
-Creator/Author: Your Name
-Date: [Current Date]
+Filename: head_tracking_control.py
+Creator/Author: Basel Mohamed Mostafa Sayed
+Date: 1/30/2026
 
 Description:
     Head tracking mouse control system using custom modules.
