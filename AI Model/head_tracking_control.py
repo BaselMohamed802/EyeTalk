@@ -6,12 +6,16 @@ Date: 1/30/2026
 Description:
     Head tracking mouse control system using custom modules.
     Recreates the exact functionality of the original code.
+    Enhanced with thread safety, movement thresholds, config files,
+    enhanced calibration, and smoothing profiles for reduced jitter.
 """
 
 import cv2
 import numpy as np
 import time
 import keyboard
+import threading  # Added for thread safety
+import yaml  # Added for configuration
 from collections import deque
 
 # Import your modules
@@ -20,7 +24,137 @@ from VisionModule.face_utils import FaceMeshDetector
 from VisionModule.head_tracking import HeadTracker
 from PyautoguiController.mouse_controller import MouseController
 
-# Constants from original code
+
+# ========== ADDED CLASSES ==========
+class EnhancedCalibrator:
+    def __init__(self, head_tracker):
+        self.head_tracker = head_tracker
+        self.calibration_samples = []
+        self.is_calibrating = False
+        
+    def start_calibration(self, num_samples=30):
+        """Start collecting calibration samples"""
+        self.calibration_samples = []
+        self.is_calibrating = True
+        self.num_samples = num_samples
+        print(f"Calibration: Look straight ahead for {num_samples/10} seconds...")
+        
+    def add_sample(self, yaw, pitch):
+        """Add a calibration sample"""
+        if self.is_calibrating and len(self.calibration_samples) < self.num_samples:
+            self.calibration_samples.append((yaw, pitch))
+            
+            if len(self.calibration_samples) >= self.num_samples:
+                self.finish_calibration()
+                
+    def finish_calibration(self):
+        """Calculate calibration offsets from collected samples"""
+        if not self.calibration_samples:
+            return
+            
+        yaw_samples = [s[0] for s in self.calibration_samples]
+        pitch_samples = [s[1] for s in self.calibration_samples]
+        
+        # Calculate median (more robust than mean for outliers)
+        median_yaw = np.median(yaw_samples)
+        median_pitch = np.median(pitch_samples)
+        
+        # Set calibration offsets
+        self.head_tracker.calibrate(median_yaw, median_pitch)
+        
+        # Calculate calibration quality
+        yaw_std = np.std(yaw_samples)
+        pitch_std = np.std(pitch_samples)
+        
+        print(f"Calibration complete!")
+        print(f"  Center: Yaw={median_yaw:.1f}°, Pitch={median_pitch:.1f}°")
+        print(f"  Stability: Yaw_std={yaw_std:.2f}°, Pitch_std={pitch_std:.2f}°")
+        
+        if yaw_std > 1.0 or pitch_std > 1.0:
+            print("  Warning: High variance detected. Try to hold your head still.")
+            
+        self.is_calibrating = False
+
+
+class SmoothingProfile:
+    def __init__(self, name, filter_length, movement_threshold, 
+                 process_interval, deadzone_radius):
+        self.name = name
+        self.filter_length = filter_length
+        self.movement_threshold = movement_threshold
+        self.process_interval = process_interval
+        self.deadzone_radius = deadzone_radius
+        
+class SmoothingProfiles:
+    FAST = SmoothingProfile(
+        name="Fast",
+        filter_length=4,
+        movement_threshold=0.3,
+        process_interval=0.005,
+        deadzone_radius=1.0
+    )
+    
+    BALANCED = SmoothingProfile(
+        name="Balanced",
+        filter_length=8,
+        movement_threshold=0.5,
+        process_interval=0.01,
+        deadzone_radius=2.0
+    )
+    
+    SMOOTH = SmoothingProfile(
+        name="Smooth",
+        filter_length=12,
+        movement_threshold=0.8,
+        process_interval=0.02,
+        deadzone_radius=3.0
+    )
+    
+    @classmethod
+    def get_all_profiles(cls):
+        return [cls.FAST, cls.BALANCED, cls.SMOOTH]
+    
+    @classmethod
+    def cycle_profile(cls, current_profile):
+        profiles = cls.get_all_profiles()
+        current_index = profiles.index(current_profile) if current_profile in profiles else 0
+        next_index = (current_index + 1) % len(profiles)
+        return profiles[next_index]
+# ====================================
+
+
+# Load configuration
+def load_config():
+    try:
+        with open('config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+    except FileNotFoundError:
+        print("config.yaml not found, using defaults")
+        config = {
+            'tracking': {
+                'yaw_range': 20,
+                'pitch_range': 10,
+                'filter_length': 8,
+                'min_detection_confidence': 0.5,
+                'min_tracking_confidence': 0.5
+            },
+            'smoothing': {
+                'movement_threshold': 0.5,
+                'process_interval': 0.01,
+                'deadzone_radius': 2.0
+            },
+            'mouse': {
+                'update_interval': 0.01
+            },
+            'display': {
+                'show_landmarks': True,
+                'show_cube': True,
+                'show_gaze_ray': True
+            }
+        }
+    return config
+
+
 FACE_OUTLINE_INDICES = [
     10, 338, 297, 332, 284, 251, 389, 356,
     454, 323, 361, 288, 397, 365, 379, 378,
@@ -29,14 +163,39 @@ FACE_OUTLINE_INDICES = [
     54, 103, 67, 109
 ]
 
-# Head tracking parameters (from original code)
-YAW_RANGE = 20  # degrees
-PITCH_RANGE = 10  # degrees
-FILTER_LENGTH = 8
+
+def apply_deadzone(x, y, last_x, last_y, deadzone_radius):
+    """Apply deadzone to filter out tiny movements"""
+    if last_x is None or last_y is None:
+        return x, y
+    
+    distance = np.sqrt((x - last_x)**2 + (y - last_y)**2)
+    if distance < deadzone_radius:
+        return last_x, last_y  # Return previous position
+    return x, y
+
 
 def main():
     print("Head Tracking Mouse Control System")
     print("==================================")
+    
+    # Load configuration
+    config = load_config()
+    
+    # Extract values from config
+    YAW_RANGE = config['tracking']['yaw_range']
+    PITCH_RANGE = config['tracking']['pitch_range']
+    FILTER_LENGTH = config['tracking']['filter_length']
+    MIN_DETECTION_CONFIDENCE = config['tracking']['min_detection_confidence']
+    MIN_TRACKING_CONFIDENCE = config['tracking']['min_tracking_confidence']
+    
+    # Initialize with balanced profile
+    current_profile = SmoothingProfiles.BALANCED
+    
+    # Extract values from profile
+    MOVEMENT_THRESHOLD = current_profile.movement_threshold
+    PROCESS_INTERVAL = current_profile.process_interval
+    DEADZONE_RADIUS = current_profile.deadzone_radius
     
     # 1. List available cameras
     print("\nScanning for cameras...")
@@ -70,25 +229,36 @@ def main():
         static_image_mode=False,
         max_num_faces=1,
         refine_landmarks=True,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5
+        min_detection_confidence=MIN_DETECTION_CONFIDENCE,
+        min_tracking_confidence=MIN_TRACKING_CONFIDENCE
     )
     
     # Initialize head tracker
     head_tracker = HeadTracker(filter_length=FILTER_LENGTH)
     
+    # Initialize enhanced calibrator
+    calibrator = EnhancedCalibrator(head_tracker)
+    
     # Initialize mouse controller
-    mouse_controller = MouseController(update_interval=0.01, enable_failsafe=False)
+    mouse_controller = MouseController(update_interval=config['mouse']['update_interval'], 
+                                      enable_failsafe=False)
     mouse_controller.start()
+    
+    # Thread lock for mouse position updates
+    mouse_lock = threading.Lock()
     
     print("\nControls:")
     print("  F7: Toggle mouse control")
-    print("  C: Calibrate (set current head position as center)")
+    print("  C: Calibrate (collect 30 samples for accurate center)")
+    print("  P: Cycle smoothing profiles (Fast/Balanced/Smooth)")
     print("  Q: Quit")
-    print("\nStarting tracking...")
+    print(f"\nStarting tracking with {current_profile.name} profile...")
     
-    # Mouse control state
+    # Movement tracking variables
     mouse_control_enabled = True
+    last_screen_x = None
+    last_screen_y = None
+    last_processed_time = time.time()
     
     # For storing raw angles before calibration
     raw_yaw = 0
@@ -96,6 +266,15 @@ def main():
     
     try:
         while camera.is_opened():
+            current_time = time.time()
+            
+            # Skip processing if too soon (frame rate limiting)
+            if current_time - last_processed_time < PROCESS_INTERVAL:
+                time.sleep(0.001)  # Small sleep to prevent CPU hog
+                continue
+                
+            last_processed_time = current_time
+            
             # Get frame
             frame = camera.get_frame()
             if frame is None:
@@ -159,9 +338,6 @@ def main():
                     # Calculate angles
                     yaw_deg, pitch_deg = head_tracker.calculate_yaw_pitch(smoothed_direction)
                     
-                    # DEBUG: Print raw angles
-                    # print(f"Raw angles: yaw={yaw_deg:.1f}, pitch={pitch_deg:.1f}")
-                    
                     # Convert to 360-degree range
                     yaw_360, pitch_360 = head_tracker.convert_angles_to_360(yaw_deg, pitch_deg)
                     
@@ -169,8 +345,9 @@ def main():
                     raw_yaw = yaw_360
                     raw_pitch = pitch_360
                     
-                    # DEBUG: Print converted angles
-                    # print(f"Converted: yaw={yaw_360:.1f}, pitch={pitch_360:.1f}")
+                    # Add to calibration if calibrating
+                    if calibrator.is_calibrating:
+                        calibrator.add_sample(raw_yaw, raw_pitch)
                     
                     # Map to screen coordinates
                     screen_width, screen_height = mouse_controller.get_screen_size()
@@ -180,20 +357,39 @@ def main():
                         YAW_RANGE, PITCH_RANGE
                     )
                     
-                    # DEBUG: Print screen coordinates
-                    # print(f"Screen before clamp: ({screen_x}, {screen_y})")
-                    
                     # Clamp to screen
                     screen_x, screen_y = head_tracker.clamp_to_screen(
                         screen_x, screen_y, screen_width, screen_height
                     )
                     
-                    # DEBUG: Print final coordinates
-                    # print(f"Screen final: ({screen_x}, {screen_y})")
+                    # Apply deadzone filter
+                    screen_x, screen_y = apply_deadzone(
+                        screen_x, screen_y, 
+                        last_screen_x, last_screen_y, 
+                        DEADZONE_RADIUS
+                    )
+                    
+                    # Check if we should update mouse position
+                    should_update = False
+                    if last_screen_x is None or last_screen_y is None:
+                        should_update = True
+                    else:
+                        # Calculate distance moved
+                        distance = np.sqrt((screen_x - last_screen_x)**2 + (screen_y - last_screen_y)**2)
+                        
+                        # Only update if movement exceeds threshold
+                        if distance > MOVEMENT_THRESHOLD:
+                            should_update = True
                     
                     # Update mouse position if enabled
-                    if mouse_control_enabled:
-                        mouse_controller.set_target(screen_x, screen_y)
+                    if mouse_control_enabled and should_update:
+                        # Store last position
+                        last_screen_x = screen_x
+                        last_screen_y = screen_y
+                        
+                        # Thread-safe update
+                        with mouse_lock:
+                            mouse_controller.set_target(screen_x, screen_y)
                     
                     # Generate and draw head cube
                     cube_corners = head_tracker.generate_head_cube(
@@ -234,8 +430,10 @@ def main():
                     cv2.putText(frame, f"Mouse: {'ON' if mouse_control_enabled else 'OFF'}", 
                                (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, 
                                (0, 255, 0) if mouse_control_enabled else (0, 0, 255), 2)
-                    cv2.putText(frame, f"Screen: ({screen_x}, {screen_y})", 
+                    cv2.putText(frame, f"Profile: {current_profile.name}", 
                                (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    cv2.putText(frame, f"Screen: ({screen_x:.0f}, {screen_y:.0f})", 
+                               (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             
             # Show FPS
             fps = camera.get_frame_rate()
@@ -254,8 +452,24 @@ def main():
                 time.sleep(0.3)  # Debounce
             
             if keyboard.is_pressed('c'):
-                head_tracker.calibrate(raw_yaw, raw_pitch)
+                if not calibrator.is_calibrating:
+                    calibrator.start_calibration(num_samples=30)
                 time.sleep(0.3)  # Debounce
+            
+            if keyboard.is_pressed('p'):  # Press 'P' to cycle profiles
+                current_profile = SmoothingProfiles.cycle_profile(current_profile)
+                
+                # Update settings
+                FILTER_LENGTH = current_profile.filter_length
+                MOVEMENT_THRESHOLD = current_profile.movement_threshold
+                PROCESS_INTERVAL = current_profile.process_interval
+                DEADZONE_RADIUS = current_profile.deadzone_radius
+                
+                # Reinitialize head tracker with new filter length
+                head_tracker = HeadTracker(filter_length=FILTER_LENGTH)
+                
+                print(f"[Profile] Switched to {current_profile.name}")
+                time.sleep(0.3)
             
             # Check for 'q' key or window close
             key = cv2.waitKey(1) & 0xFF
@@ -272,6 +486,7 @@ def main():
         mouse_controller.stop()
         cv2.destroyAllWindows()
         print("Cleanup complete.")
+
 
 if __name__ == "__main__":
     main()
