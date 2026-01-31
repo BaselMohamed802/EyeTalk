@@ -1,0 +1,19 @@
+tracking:
+  yaw_range: 20
+  pitch_range: 10
+  filter_length: 8
+  min_detection_confidence: 0.5
+  min_tracking_confidence: 0.5
+  
+smoothing:
+  movement_threshold: 0.5
+  process_interval: 0.01
+  deadzone_radius: 2.0
+  
+mouse:
+  update_interval: 0.01
+  
+display:
+  show_landmarks: true
+  show_cube: true
+  show_gaze_ray: true
