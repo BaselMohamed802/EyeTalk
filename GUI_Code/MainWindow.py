@@ -1,32 +1,45 @@
+"""
+EyeTalk - Virtual Keyboard Widget
+This widget creates a virtual keyboard interface for typing text using buttons.
+Each button press appends characters to form words and sentences.
+"""
 
 from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton
-from PySide6.QtGui import QAction
-
+from TTS_Engine import TTS 
 
 class Main_GUI_Window(QWidget):
     """
-        Main widget class that implements a virtual keyboard.
-        Allows users to type text by clicking letter buttons.
+    Main widget class that implements a virtual keyboard.
+    Allows users to type text by clicking letter buttons.
 
-    """ 
-    def __init__(self,):
+    """
+    def __init__(self):
         """Initialize the widget and set up the virtual keyboard interface."""
-        super().__init__() # Initialize parent QWidget class
-     
+        super().__init__()  # Initialize parent QWidget class
+        
         # ============================================
         # WINDOW SETUP
         # ============================================
         self.setWindowTitle("EyeTalk")  # Set window title
         self.current_text = ""  # Variable to store the typed text (starts empty)
-
         
         # ============================================
         # TEXT DISPLAY AREA
         # ============================================
         
+        self.tts = TTS()
         # Label to show "Your Text:" prompt
         Display_Label = QLabel("Your Text:")
-        
+        Display_Label.setStyleSheet("""
+        QLabel {
+            padding: 15px;
+            font-size: 20px;
+            min-width: 200px;
+            min-height: 100px;
+            border-radius: 8px;
+        }
+    """)
+
         # Label that displays the typed text (updates as user types)
         self.text_holder_label = QLabel("")
         self.text_holder_label.setStyleSheet("""
@@ -46,37 +59,191 @@ class Main_GUI_Window(QWidget):
 
         Letter_ButtonQ = QPushButton("Q")
         Letter_ButtonQ.clicked.connect(self.Display_Letter)
+        Letter_ButtonQ.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonW = QPushButton("W")
         Letter_ButtonW.clicked.connect(self.Display_Letter)
+        Letter_ButtonW.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonE = QPushButton("E")
         Letter_ButtonE.clicked.connect(self.Display_Letter)
+        Letter_ButtonE.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonR = QPushButton("R")
         Letter_ButtonR.clicked.connect(self.Display_Letter)
+        Letter_ButtonR.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonT = QPushButton("T")
         Letter_ButtonT.clicked.connect(self.Display_Letter)
+        Letter_ButtonT.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonY = QPushButton("Y")
         Letter_ButtonY.clicked.connect(self.Display_Letter)
+        Letter_ButtonY.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonU = QPushButton("U")
         Letter_ButtonU.clicked.connect(self.Display_Letter)
+        Letter_ButtonU.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonI = QPushButton("I")
         Letter_ButtonI.clicked.connect(self.Display_Letter)
+        Letter_ButtonI.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonO = QPushButton("O")
         Letter_ButtonO.clicked.connect(self.Display_Letter)
+        Letter_ButtonO.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonP = QPushButton("P")
         Letter_ButtonP.clicked.connect(self.Display_Letter)
+        Letter_ButtonP.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         # Delete button (removes last character)
         Letter_Button_Delete = QPushButton("⌫ Delete")
         Letter_Button_Delete.clicked.connect(self.Delete_Button)
+        Letter_Button_Delete.setStyleSheet("""
+            QPushButton {
+                color: white;
+                background-color: #dc3545;
+                padding: 10px;
+                border: 2px solid #bd2130;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+        """)
 
         # ============================================
         # KEYBOARD BUTTONS - ROW 2 (ASDFGHJKL)
@@ -85,34 +252,174 @@ class Main_GUI_Window(QWidget):
 
         Letter_ButtonA = QPushButton("A")
         Letter_ButtonA.clicked.connect(self.Display_Letter)
+        Letter_ButtonA.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonS = QPushButton("S")
         Letter_ButtonS.clicked.connect(self.Display_Letter)
+        Letter_ButtonS.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonD = QPushButton("D")
         Letter_ButtonD.clicked.connect(self.Display_Letter)
+        Letter_ButtonD.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonF = QPushButton("F")
         Letter_ButtonF.clicked.connect(self.Display_Letter)
+        Letter_ButtonF.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonG = QPushButton("G")
         Letter_ButtonG.clicked.connect(self.Display_Letter)
+        Letter_ButtonG.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonH = QPushButton("H")
         Letter_ButtonH.clicked.connect(self.Display_Letter)
+        Letter_ButtonH.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonJ = QPushButton("J")
         Letter_ButtonJ.clicked.connect(self.Display_Letter)
+        Letter_ButtonJ.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonK = QPushButton("K")
         Letter_ButtonK.clicked.connect(self.Display_Letter)
+        Letter_ButtonK.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonL = QPushButton("L")
         Letter_ButtonL.clicked.connect(self.Display_Letter)
+        Letter_ButtonL.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
-        # Serves no purpose atm, will be used for the TTS in future
-        Letter_Button_Enter = QPushButton("⏎ Enter") 
-        Letter_Button_Enter.clicked.connect(self.Display_Letter)
+        # Enter button (adds new line)
+        Letter_Button_Enter = QPushButton("⏎ Enter")
+        Letter_Button_Enter.clicked.connect(self.Text_To_Speech)
+        Letter_Button_Enter.setStyleSheet("""
+            QPushButton {
+                color: white;
+                background-color: #28a745;
+                padding: 10px;
+                border: 2px solid #1e7e34;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+        """)
 
         # ============================================
         # KEYBOARD BUTTONS - ROW 3 (ZXCVBNM)
@@ -121,42 +428,184 @@ class Main_GUI_Window(QWidget):
 
         Letter_ButtonZ = QPushButton("Z")
         Letter_ButtonZ.clicked.connect(self.Display_Letter)
+        Letter_ButtonZ.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonX = QPushButton("X")
         Letter_ButtonX.clicked.connect(self.Display_Letter)
+        Letter_ButtonX.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonC = QPushButton("C")
         Letter_ButtonC.clicked.connect(self.Display_Letter)
+        Letter_ButtonC.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonV = QPushButton("V")
         Letter_ButtonV.clicked.connect(self.Display_Letter)
+        Letter_ButtonV.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonB = QPushButton("B")
         Letter_ButtonB.clicked.connect(self.Display_Letter)
+        Letter_ButtonB.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonN = QPushButton("N")
         Letter_ButtonN.clicked.connect(self.Display_Letter)
+        Letter_ButtonN.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         Letter_ButtonM = QPushButton("M")
         Letter_ButtonM.clicked.connect(self.Display_Letter)
-        
+        Letter_ButtonM.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #f8f9fa;
+                padding: 10px;
+                border: 2px solid #dee2e6;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
         # Space bar button (adds space between words)
         Space_Bar = QPushButton("⎵ Space")
         Space_Bar.clicked.connect(self.Space_Bar)
-
+        Space_Bar.setStyleSheet("""
+            QPushButton {
+                color: white;
+                background-color: #007bff;
+                padding: 10px 20px;
+                border: 2px solid #0056b3;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #0069d9;
+            }
+        """)
         # ============================================
         # Emergency BUTTONS 
         # ============================================
         # Create pre-defined sentences in a button
+    
+        EM1_Button = QPushButton("I Feel Pain!!")
+        EM1_Button.clicked.connect(self.Display_Letter)  
+        EM1_Button.setStyleSheet("color: white; background-color: #dc3545; padding: 8px; border: 2px solid #bd2130; border-radius: 10px; font-weight: bold; font-size: 14px;}")
+        
+        EM2_Button = QPushButton("I Need Water")
+        EM2_Button.clicked.connect(self.Display_Letter)
+        EM2_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 8px; text-align: center;")
+        
+        EM3_Button = QPushButton("I Want Doctor")
+        EM3_Button.clicked.connect(self.Display_Letter)
+        EM3_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 8px; text-align: center;")
+        
+        EM4_Button = QPushButton("Leave me Alone")
+        EM4_Button.clicked.connect(self.Display_Letter)
+        EM4_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 8px; text-align: center;")
+        
+        EM5_Button = QPushButton("Clear The screen")
+        EM5_Button.clicked.connect(self.Clear_Whole_Text)
+        EM5_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 8px; text-align: center;")
+        
+        # ============================================
+        # LAYOUT SETUP - ORGANIZING THE INTERFACE
+        # ============================================
 
-
-        #insert your EM_Buttons here 
-
+        #Creating a Vertical Layout For the Emergencey Buttons
+        Vertical_EM_Button = QVBoxLayout()
+        Vertical_EM_Button.setSpacing(10)  # Space between buttons (15px)
+        Vertical_EM_Button.setContentsMargins(30, 30, 30, 30)  # Padding around the group
+        Vertical_EM_Button.addWidget(EM1_Button) #buttons alignments
+        Vertical_EM_Button.addWidget(EM2_Button)
+        Vertical_EM_Button.addWidget(EM3_Button)
+        Vertical_EM_Button.addWidget(EM4_Button)
+        Vertical_EM_Button.addWidget(EM5_Button)
+        
         # HORIZONTAL LAYOUT: Text display area
         # Contains the "Your Text:" label and the text display label
         H_layout = QHBoxLayout()
         H_layout.setSpacing(20)
+        H_layout.addLayout(Vertical_EM_Button)
         H_layout.addWidget(Display_Label)
         H_layout.addWidget(self.text_holder_label)
        
@@ -234,11 +683,6 @@ class Main_GUI_Window(QWidget):
             self.text_holder_label.setText(f"{self.current_text}")
     
     def Space_Bar(self):
-        """
-        Handles space bar button click.
-        Adds a space character to the current text.
-    
-        """
         # Add a space character to separate words
         self.current_text += " "
         
@@ -246,11 +690,6 @@ class Main_GUI_Window(QWidget):
         self.text_holder_label.setText(f"{self.current_text}")
     
     def Delete_Button(self):
-        """
-        Handles delete button click.
-        Removes the last character from the current text.
-
-        """
         # Remove the last character (if there is any text)
         if self.current_text:  # Only delete if there's text to delete
             self.current_text = self.current_text[:-1]
@@ -259,11 +698,6 @@ class Main_GUI_Window(QWidget):
             self.text_holder_label.setText(f"{self.current_text}")
 
     def Clear_Whole_Text(self):
-        """
-        Handles Clear button click.
-        Removes the all character from the current text.
-
-        """
         
         if self.current_text:  # Only Clear if there's text to delete
             self.current_text = ""
@@ -271,7 +705,7 @@ class Main_GUI_Window(QWidget):
             # Update the display
             self.text_holder_label.setText(f"{self.current_text}")
 
-
-
-
-
+    def Text_To_Speech(self):
+         # Speak whatever is in current_text
+            self.tts.speak(self.current_text)
+    
