@@ -4,31 +4,23 @@ Creator/Author: Basel Mohamed Mostafa Sayed
 Date: 2/1/2026
 
 Description:
-    Updated Head Tracking Mouse Control System (FULL SCRIPT) with applied improvements:
+    Head Tracking Mouse Control System (Config-driven, FULL SCRIPT)
 
-    ✅ Improvements applied
-    1) NO 0..360 angle conversion (continuous yaw/pitch in [-180, +180], wrap-safe math)
-    2) Calibration no longer depends on HeadTracker offsets (stores center_yaw/center_pitch)
-       - Robust: median sampling
-       - UI progress display
-       - Persistent save/load to JSON ("head_calibration.json")
-    3) Cursor-space filtering (EMA/Kalman) via your existing FilterManager
-    4) Profile switching preserves calibration + avoids re-instantiating HeadTracker
-       - Only resizes smoothing buffers safely
-    5) Edge-trigger keyboard handling (no time.sleep debounce; avoids multi-toggle)
-    6) Supports ABSOLUTE and RELATIVE (joystick-like) head control modes (toggle with 'M')
-    7) Keeps movement threshold + deadzone behavior, but applied after filtering (better feel)
+    Main upgrades:
+      - All tuning now lives in config.yaml (including per-profile overrides)
+      - Continuous yaw/pitch [-180,+180] + wrap-safe subtraction
+      - Calibration is robust (median), UI progress, persistent save/load
+      - Cursor-space filtering (EMA/Kalman) controlled from config
+      - Profile switching preserves state (no HeadTracker re-instantiation)
+      - Edge-trigger hotkeys (no debounce sleeps)
+      - Absolute + Relative modes
 
-Controls:
-    F7 : Toggle mouse control
-    C  : Calibrate (collect N samples)
-    P  : Cycle profiles (Fast/Balanced/Smooth)
-    M  : Toggle control mode (Absolute/Relative)
-    Q  : Quit
-
-Notes:
-    - This script keeps your cube + gaze ray rendering.
-    - It stops using HeadTracker.convert_angles_to_360() and HeadTracker.map_to_screen() entirely.
+Hotkeys:
+  F7 : Toggle mouse control
+  C  : Calibrate (uses calibration.samples)
+  P  : Cycle profiles (FAST -> BALANCED -> SMOOTH)
+  M  : Toggle mode (absolute <-> relative)
+  Q  : Quit
 """
 
 import os
@@ -45,27 +37,24 @@ import yaml
 import keyboard
 
 # -----------------------------
-# Robust imports (project vs local sandbox)
+# Robust imports
 # -----------------------------
 try:
-    # Your project layout
     from VisionModule.camera import IrisCamera, print_camera_info
     from VisionModule.face_utils import FaceMeshDetector
     from VisionModule.head_tracking import HeadTracker
     from PyautoguiController.mouse_controller import MouseController
 except Exception:
-    # Local sandbox fallback (for testing in this chat environment)
     from camera import IrisCamera, print_camera_info
     from face_utils import FaceMeshDetector
     from head_tracking import HeadTracker
     from mouse_controller import MouseController
 
 from Filters.filterManager import FilterManager
-from head_tracking_helper import SmoothingProfiles
 
 
 # -----------------------------
-# Constants / UI helpers
+# Constants
 # -----------------------------
 FACE_OUTLINE_INDICES = [
     10, 338, 297, 332, 284, 251, 389, 356,
@@ -75,62 +64,78 @@ FACE_OUTLINE_INDICES = [
     54, 103, 67, 109
 ]
 
-CALIBRATION_FILE = "head_calibration.json"
+PROFILE_ORDER = ["FAST", "BALANCED", "SMOOTH"]
 
 
 # -----------------------------
-# Config
+# Config utilities
 # -----------------------------
-def load_config():
+def deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge override into base (returns new dict)."""
+    out = dict(base)
+    for k, v in (override or {}).items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def load_config(path: str = "config.yaml") -> dict:
     """
-    Loads config from:
-      1) ./config.yaml
-      2) ./head_track_config.yaml
-      3) defaults
+    Loads config.yaml and merges missing keys with defaults.
+    If missing, returns defaults (so code still runs).
     """
     defaults = {
-        'tracking': {
-            'yaw_range': 20,
-            'pitch_range': 10,
-            'filter_length': 8,
-            'min_detection_confidence': 0.5,
-            'min_tracking_confidence': 0.5
+        "tracking": {
+            "yaw_range": 20,
+            "pitch_range": 10,
+            "filter_length": 8,
+            "invert_x": True,
+            "invert_y": True,
+            "min_detection_confidence": 0.5,
+            "min_tracking_confidence": 0.5,
         },
-        'smoothing': {
-            'movement_threshold': 0.5,
-            'process_interval': 0.01,
-            'deadzone_radius': 2.0
+        "smoothing": {"process_interval": 0.01},
+        "control": {
+            "default_mode": "absolute",
+            "start_mouse_enabled": True,
+            "movement_threshold_px": 0.5,
+            "pixel_deadzone_radius": 2.0,
+            "relative": {
+                "max_speed_px_per_s": 1800.0,
+                "deadzone_deg": 1.5,
+                "expo": 1.6,
+            },
         },
-        'mouse': {
-            'update_interval': 0.01
+        "filter": {
+            "type": "kalman",
+            "ema": {"alpha": 0.55},
+            "kalman": {"dt": 1.0, "process_noise": 0.002, "measurement_noise": 0.08},
         },
-        'display': {
-            'show_landmarks': True,
-            'show_cube': True,
-            'show_gaze_ray': True
-        }
+        "profiles": {"active": "BALANCED"},
+        "calibration": {"file": "head_calibration.json", "autosave": True, "samples": 30},
+        "mouse": {"update_interval": 0.01},
+        "display": {"show_landmarks": True, "show_cube": True, "show_gaze_ray": True},
     }
 
-    for path in ("config.yaml", "head_track_config.yaml"):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                cfg = yaml.safe_load(f) or {}
-            # shallow merge defaults <- cfg
-            for k, v in defaults.items():
-                if k not in cfg or not isinstance(cfg[k], dict):
-                    cfg[k] = v
-                else:
-                    merged = dict(v)
-                    merged.update(cfg[k])
-                    cfg[k] = merged
-            return cfg
-        except FileNotFoundError:
-            pass
-        except Exception as e:
-            print(f"[Config] Failed to read {path}: {e}")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            user_cfg = yaml.safe_load(f) or {}
+        return deep_merge(defaults, user_cfg)
+    except FileNotFoundError:
+        print("[Config] config.yaml not found. Using defaults.")
+        return defaults
+    except Exception as e:
+        print(f"[Config] Failed reading config.yaml: {e}. Using defaults.")
+        return defaults
 
-    print("[Config] No config file found, using defaults.")
-    return defaults
+
+def get_effective_config(cfg: dict, profile_name: str) -> dict:
+    """Applies profiles.<PROFILE> overrides on top of base config."""
+    profiles = cfg.get("profiles", {}) or {}
+    prof_block = (profiles.get(profile_name, {}) or {})
+    return deep_merge(cfg, prof_block)
 
 
 # -----------------------------
@@ -150,13 +155,11 @@ class EdgeKey:
 # Angle math (continuous, wrap-safe)
 # -----------------------------
 def wrap_deg(angle: float) -> float:
-    """Wrap to (-180, +180]."""
     a = (angle + 180.0) % 360.0 - 180.0
     return 180.0 if a == -180.0 else a
 
 
 def angle_diff_deg(a: float, b: float) -> float:
-    """Smallest signed difference a - b in degrees, result in (-180, +180]."""
     return wrap_deg(a - b)
 
 
@@ -197,7 +200,7 @@ class CalibrationManager:
         self._target_n = max(10, int(num_samples))
         self._yaw_samples.clear()
         self._pitch_samples.clear()
-        print(f"[Calibration] Hold still and look straight ahead... collecting {self._target_n} samples.")
+        print(f"[Calibration] Collecting {self._target_n} samples...")
 
     def add_sample(self, yaw_deg: float, pitch_deg: float):
         if not self._calibrating:
@@ -218,6 +221,7 @@ class CalibrationManager:
         ys = sorted(self._yaw_samples)
         ps = sorted(self._pitch_samples)
         mid = len(ys) // 2
+
         if len(ys) % 2 == 1:
             cy = ys[mid]
             cp = ps[mid]
@@ -235,8 +239,6 @@ class CalibrationManager:
         print("[Calibration] Complete.")
         print(f"  Center yaw={self.cal.center_yaw_deg:.2f}°, pitch={self.cal.center_pitch_deg:.2f}°")
         print(f"  Stability std: yaw={yaw_std:.2f}°, pitch={pitch_std:.2f}°")
-        if yaw_std > 1.0 or pitch_std > 1.0:
-            print("  Warning: high variance detected. Try again with steadier pose.")
 
     def save(self, path: str) -> bool:
         try:
@@ -263,33 +265,66 @@ class CalibrationManager:
 
 
 # -----------------------------
+# HeadTracker buffer resize (preserve state; no re-instantiation)
+# -----------------------------
+def resize_headtracker_buffers(head_tracker: HeadTracker, new_len: int):
+    new_len = int(max(1, new_len))
+    if getattr(head_tracker, "filter_length", None) == new_len:
+        return
+
+    # Preserve last values as seed
+    try:
+        last_origin = head_tracker.ray_origins[-1] if len(head_tracker.ray_origins) else np.array([0.0, 0.0, 0.0], dtype=float)
+        last_dir = head_tracker.ray_directions[-1] if len(head_tracker.ray_directions) else np.array([0.0, 0.0, -1.0], dtype=float)
+    except Exception:
+        last_origin = np.array([0.0, 0.0, 0.0], dtype=float)
+        last_dir = np.array([0.0, 0.0, -1.0], dtype=float)
+
+    # Preserve old offsets (even if unused)
+    yaw_off = getattr(head_tracker, "calibration_offset_yaw", 0.0)
+    pit_off = getattr(head_tracker, "calibration_offset_pitch", 0.0)
+
+    head_tracker.filter_length = new_len
+    head_tracker.ray_origins = deque(maxlen=new_len)
+    head_tracker.ray_directions = deque(maxlen=new_len)
+
+    for _ in range(new_len):
+        head_tracker.ray_origins.append(np.array(last_origin, dtype=float))
+        head_tracker.ray_directions.append(np.array(last_dir, dtype=float))
+
+    head_tracker.calibration_offset_yaw = yaw_off
+    head_tracker.calibration_offset_pitch = pit_off
+
+
+# -----------------------------
 # Control core (mapping + cursor-space filtering)
 # -----------------------------
 class HeadControlCore:
-    """
-    Converts yaw/pitch -> screen target, with:
-      - Absolute and Relative modes
-      - Cursor-space filter (EMA/Kalman)
-      - Pixel deadzone + movement threshold gating
-    """
-
     def __init__(self, screen_w: int, screen_h: int, yaw_range_deg: float, pitch_range_deg: float):
         self.screen_w = int(screen_w)
         self.screen_h = int(screen_h)
+
+        # Absolute sensitivity (config-driven)
         self.yaw_range = float(yaw_range_deg)
         self.pitch_range = float(pitch_range_deg)
 
-        self.mode = "absolute"  # "absolute" | "relative"
+        # Inversion (config-driven)
+        self.invert_x = True
+        self.invert_y = True
 
+        # Modes
+        self.mode = "absolute"  # absolute | relative
+
+        # Gating
         self.movement_threshold_px = 0.5
         self.pixel_deadzone_radius = 2.0
 
-        # Relative mode settings
+        # Relative mode tuning
+        self.max_speed_px_per_s = 1800.0
         self.relative_deadzone_deg = 1.5
         self.relative_expo = 1.6
-        self.max_speed_px_per_s = 1600.0
 
-        # Internal cursor (relative mode integrator)
+        # Integrator state (relative)
         self._cursor_x = self.screen_w / 2.0
         self._cursor_y = self.screen_h / 2.0
 
@@ -297,60 +332,16 @@ class HeadControlCore:
         self._last_sent_y = None
         self._last_t = None
 
-        # Filter
-        self.filter = FilterManager(filter_type="kalman", dt=1.0, process_noise=2e-3, measurement_noise=8e-2)
+        # Filter (config-driven)
+        self.filter = FilterManager(filter_type="kalman", dt=1.0, process_noise=0.002, measurement_noise=0.08)
 
         # Calibration
         self.cal_mgr = CalibrationManager()
-        self._loaded_cal = self.cal_mgr.load(CALIBRATION_FILE)
-        if self._loaded_cal:
-            print(f"[Calibration] Loaded from {CALIBRATION_FILE}")
-
-    def set_profile(self, profile):
-        """
-        profile: SmoothingProfile (from SmoothingProfiles)
-          - filter_length handled elsewhere (HeadTracker buffers)
-          - process_interval handled in main loop
-          - deadzone_radius mapped to pixel_deadzone_radius
-          - movement_threshold mapped to movement_threshold_px
-        Also sets filter type/params for better feel.
-        """
-        self.movement_threshold_px = float(profile.movement_threshold)
-        self.pixel_deadzone_radius = float(profile.deadzone_radius)
-
-        # Filter presets by profile name
-        name = (profile.name or "").lower()
-        if "fast" in name:
-            # EMA: snappier
-            self.filter = FilterManager(filter_type="ema", alpha=0.55)
-            self.max_speed_px_per_s = 2200.0
-            self.relative_deadzone_deg = 1.2
-            self.relative_expo = 1.4
-        elif "smooth" in name:
-            # Kalman: heavier smoothing
-            self.filter = FilterManager(filter_type="kalman", dt=1.0, process_noise=8e-4, measurement_noise=1.2e-1)
-            self.max_speed_px_per_s = 1500.0
-            self.relative_deadzone_deg = 1.8
-            self.relative_expo = 1.8
-        else:
-            # Balanced
-            self.filter = FilterManager(filter_type="kalman", dt=1.0, process_noise=2e-3, measurement_noise=8e-2)
-            self.max_speed_px_per_s = 1800.0
-            self.relative_deadzone_deg = 1.5
-            self.relative_expo = 1.6
-
-        # Reset filter to avoid a big transient on profile switch
-        try:
-            self.filter.reset()
-        except Exception:
-            pass
 
     def toggle_mode(self):
         self.mode = "relative" if self.mode == "absolute" else "absolute"
-        # Reset integrator center on mode change
         self._cursor_x = self.screen_w / 2.0
         self._cursor_y = self.screen_h / 2.0
-        # Reset last sent to avoid sudden gating weirdness
         self._last_sent_x = None
         self._last_sent_y = None
         try:
@@ -358,39 +349,30 @@ class HeadControlCore:
         except Exception:
             pass
 
-    def start_calibration(self, num_samples: int = 30):
-        self.cal_mgr.start(num_samples=num_samples)
+    def start_calibration(self, num_samples: int):
+        self.cal_mgr.start(num_samples)
 
     def update(self, yaw_deg: float, pitch_deg: float, now: float):
-        """
-        Returns: (should_send, fx, fy, debug_dict)
-        """
         yaw = wrap_deg(yaw_deg)
         pitch = wrap_deg(pitch_deg)
 
-        # If calibrating, feed samples
         if self.cal_mgr.is_calibrating:
             self.cal_mgr.add_sample(yaw, pitch)
 
-        # Auto-set center if never calibrated (pragmatic default)
+        # Auto-initialize center if not calibrated (pragmatic)
         if not self.cal_mgr.cal.calibrated:
             self.cal_mgr.cal.center_yaw_deg = yaw
             self.cal_mgr.cal.center_pitch_deg = pitch
             self.cal_mgr.cal.calibrated = True
 
-        # Delta from center
         dyaw = angle_diff_deg(yaw, self.cal_mgr.cal.center_yaw_deg)
         dpitch = angle_diff_deg(pitch, self.cal_mgr.cal.center_pitch_deg)
 
-        # ---- Axis inversion (fix reversed directions) ----
-        INVERT_X = True   # yaw: right<->left
-        INVERT_Y = True   # pitch: up<->down
-
-        if INVERT_X:
+        # Apply inversion (you confirmed this was needed)
+        if self.invert_x:
             dyaw = -dyaw
-        if INVERT_Y:
+        if self.invert_y:
             dpitch = -dpitch
-
 
         # dt
         if self._last_t is None:
@@ -399,14 +381,14 @@ class HeadControlCore:
             dt = max(1e-4, now - self._last_t)
         self._last_t = now
 
-        # Map -> raw target
+        # Map -> raw
         if self.mode == "absolute":
             nx = clamp(dyaw / self.yaw_range, -1.0, 1.0)
             ny = clamp(dpitch / self.pitch_range, -1.0, 1.0)
             raw_x = (self.screen_w / 2.0) + nx * (self.screen_w / 2.0)
             raw_y = (self.screen_h / 2.0) + ny * (self.screen_h / 2.0)
         else:
-            # Relative joystick-like (delta -> velocity -> integrate)
+            # Relative (joystick-like)
             dz = self.relative_deadzone_deg
             ax = 0.0 if abs(dyaw) < dz else dyaw
             ay = 0.0 if abs(dpitch) < dz else dpitch
@@ -420,6 +402,7 @@ class HeadControlCore:
 
             vx = nx * self.max_speed_px_per_s
             vy = ny * self.max_speed_px_per_s
+
             self._cursor_x += vx * dt
             self._cursor_y += vy * dt
             raw_x, raw_y = self._cursor_x, self._cursor_y
@@ -428,10 +411,10 @@ class HeadControlCore:
         raw_x = clamp(raw_x, 0.0, float(self.screen_w - 1))
         raw_y = clamp(raw_y, 0.0, float(self.screen_h - 1))
 
-        # Filter in cursor-space
+        # Filter in cursor space
         fx, fy = self.filter.apply_filter(raw_x, raw_y)
 
-        # Pixel deadzone (after filtering)
+        # Pixel deadzone AFTER filtering
         if self.pixel_deadzone_radius > 0.0 and self._last_sent_x is not None and self._last_sent_y is not None:
             if dist2(fx, fy, self._last_sent_x, self._last_sent_y) < (self.pixel_deadzone_radius ** 2):
                 fx, fy = self._last_sent_x, self._last_sent_y
@@ -463,76 +446,76 @@ class HeadControlCore:
 
 
 # -----------------------------
-# HeadTracker buffer resize (preserve state; no re-instantiation)
+# Apply config to runtime
 # -----------------------------
-def resize_headtracker_buffers(head_tracker: HeadTracker, new_len: int):
-    """
-    Resizes the internal smoothing deques of HeadTracker while preserving:
-      - calibration offsets
-      - last known orientation (seed)
-    """
-    new_len = int(max(1, new_len))
-    if getattr(head_tracker, "filter_length", None) == new_len:
-        return
+def apply_effective_config(eff: dict, head_tracker: HeadTracker, core: HeadControlCore):
+    # Tracking
+    core.yaw_range = float(eff["tracking"]["yaw_range"])
+    core.pitch_range = float(eff["tracking"]["pitch_range"])
+    core.invert_x = bool(eff["tracking"].get("invert_x", True))
+    core.invert_y = bool(eff["tracking"].get("invert_y", True))
 
-    # Try to preserve last values (seed)
+    resize_headtracker_buffers(head_tracker, int(eff["tracking"]["filter_length"]))
+
+    # Control
+    core.mode = str(eff["control"].get("default_mode", core.mode)).lower()
+    core.movement_threshold_px = float(eff["control"]["movement_threshold_px"])
+    core.pixel_deadzone_radius = float(eff["control"]["pixel_deadzone_radius"])
+
+    rel = eff["control"].get("relative", {}) or {}
+    core.max_speed_px_per_s = float(rel.get("max_speed_px_per_s", core.max_speed_px_per_s))
+    core.relative_deadzone_deg = float(rel.get("deadzone_deg", core.relative_deadzone_deg))
+    core.relative_expo = float(rel.get("expo", core.relative_expo))
+
+    # Filter
+    fcfg = eff.get("filter", {}) or {}
+    ftype = str(fcfg.get("type", "kalman")).lower()
+
+    if ftype == "ema":
+        alpha = float((fcfg.get("ema", {}) or {}).get("alpha", 0.55))
+        core.filter = FilterManager(filter_type="ema", alpha=alpha)
+    else:
+        kcfg = fcfg.get("kalman", {}) or {}
+        dt = float(kcfg.get("dt", 1.0))
+        pn = float(kcfg.get("process_noise", 0.002))
+        mn = float(kcfg.get("measurement_noise", 0.08))
+        core.filter = FilterManager(filter_type="kalman", dt=dt, process_noise=pn, measurement_noise=mn)
+
     try:
-        if len(head_tracker.ray_origins) > 0:
-            last_origin = head_tracker.ray_origins[-1]
-        else:
-            last_origin = np.array([0.0, 0.0, 0.0], dtype=float)
-
-        if len(head_tracker.ray_directions) > 0:
-            last_dir = head_tracker.ray_directions[-1]
-        else:
-            last_dir = np.array([0.0, 0.0, -1.0], dtype=float)
+        core.filter.reset()
     except Exception:
-        last_origin = np.array([0.0, 0.0, 0.0], dtype=float)
-        last_dir = np.array([0.0, 0.0, -1.0], dtype=float)
+        pass
 
-    # Preserve calibration offsets if they exist (even if we no longer use them)
-    yaw_off = getattr(head_tracker, "calibration_offset_yaw", 0.0)
-    pit_off = getattr(head_tracker, "calibration_offset_pitch", 0.0)
-
-    head_tracker.filter_length = new_len
-    head_tracker.ray_origins = deque(maxlen=new_len)
-    head_tracker.ray_directions = deque(maxlen=new_len)
-
-    # Seed buffers to avoid "empty filter" transient
-    for _ in range(new_len):
-        head_tracker.ray_origins.append(np.array(last_origin, dtype=float))
-        head_tracker.ray_directions.append(np.array(last_dir, dtype=float))
-
-    head_tracker.calibration_offset_yaw = yaw_off
-    head_tracker.calibration_offset_pitch = pit_off
+    # Loop interval
+    process_interval = float((eff.get("smoothing", {}) or {}).get("process_interval", 0.01))
+    return process_interval
 
 
 # -----------------------------
 # Main
 # -----------------------------
 def main():
-    print("Head Tracking Mouse Control System (Updated)")
-    print("===========================================")
+    print("Head Tracking Mouse Control System (Config-driven)")
+    print("=================================================")
 
-    config = load_config()
+    cfg = load_config("config.yaml")
 
-    # Tracking ranges
-    YAW_RANGE = float(config["tracking"]["yaw_range"])
-    PITCH_RANGE = float(config["tracking"]["pitch_range"])
+    # Display
+    SHOW_LANDMARKS = bool(cfg["display"].get("show_landmarks", True))
+    SHOW_CUBE = bool(cfg["display"].get("show_cube", True))
+    SHOW_GAZE_RAY = bool(cfg["display"].get("show_gaze_ray", True))
 
-    # Detection settings
-    FILTER_LENGTH = int(config["tracking"]["filter_length"])
-    MIN_DETECTION_CONF = float(config["tracking"]["min_detection_confidence"])
-    MIN_TRACKING_CONF = float(config["tracking"]["min_tracking_confidence"])
+    # Calibration config
+    cal_cfg = cfg.get("calibration", {}) or {}
+    CAL_FILE = str(cal_cfg.get("file", "head_calibration.json"))
+    CAL_AUTOSAVE = bool(cal_cfg.get("autosave", True))
+    CAL_SAMPLES = int(cal_cfg.get("samples", 30))
 
-    # Display options
-    SHOW_LANDMARKS = bool(config["display"].get("show_landmarks", True))
-    SHOW_CUBE = bool(config["display"].get("show_cube", True))
-    SHOW_GAZE_RAY = bool(config["display"].get("show_gaze_ray", True))
-
-    # Start with balanced profile
-    current_profile = SmoothingProfiles.BALANCED
-    PROCESS_INTERVAL = float(current_profile.process_interval)
+    # Starting profile
+    active_profile = str((cfg.get("profiles", {}) or {}).get("active", "BALANCED")).upper()
+    if active_profile not in PROFILE_ORDER:
+        active_profile = "BALANCED"
+    profile_idx = PROFILE_ORDER.index(active_profile)
 
     # 1) Camera selection
     print("\nScanning for cameras...")
@@ -561,36 +544,53 @@ def main():
         static_image_mode=False,
         max_num_faces=1,
         refine_landmarks=True,
-        min_detection_confidence=MIN_DETECTION_CONF,
-        min_tracking_confidence=MIN_TRACKING_CONF
+        min_detection_confidence=float(cfg["tracking"]["min_detection_confidence"]),
+        min_tracking_confidence=float(cfg["tracking"]["min_tracking_confidence"]),
     )
 
-    head_tracker = HeadTracker(filter_length=FILTER_LENGTH)
+    head_tracker = HeadTracker(filter_length=int(cfg["tracking"]["filter_length"]))
 
     mouse_controller = MouseController(
-        update_interval=float(config["mouse"]["update_interval"]),
-        enable_failsafe=False
+        update_interval=float(cfg["mouse"]["update_interval"]),
+        enable_failsafe=False,
     )
     mouse_controller.start()
-
     screen_w, screen_h = mouse_controller.get_screen_size()
-    core = HeadControlCore(screen_w, screen_h, yaw_range_deg=YAW_RANGE, pitch_range_deg=PITCH_RANGE)
-    core.set_profile(current_profile)
+
+    core = HeadControlCore(
+        screen_w, screen_h,
+        yaw_range_deg=float(cfg["tracking"]["yaw_range"]),
+        pitch_range_deg=float(cfg["tracking"]["pitch_range"]),
+    )
+
+    # Load calibration if present
+    if core.cal_mgr.load(CAL_FILE):
+        print(f"[Calibration] Loaded from {CAL_FILE}")
+
+    # Apply active profile effective config
+    current_profile_name = PROFILE_ORDER[profile_idx]
+    eff = get_effective_config(cfg, current_profile_name)
+    PROCESS_INTERVAL = apply_effective_config(eff, head_tracker, core)
+
+    # Startup mouse enabled
+    mouse_control_enabled = bool((eff.get("control", {}) or {}).get("start_mouse_enabled", True))
 
     # Thread lock for mouse updates
     mouse_lock = threading.Lock()
 
     # Controls
-    print("\nControls:")
+    print("\nHotkeys:")
     print("  F7: Toggle mouse control")
-    print("  C : Calibrate (collect 30 samples)")
-    print("  P : Cycle profiles (Fast/Balanced/Smooth)")
-    print("  M : Toggle mode (Absolute/Relative)")
+    print("  C : Calibrate")
+    print("  P : Cycle profiles (FAST/BALANCED/SMOOTH)")
+    print("  M : Toggle mode (absolute/relative)")
     print("  Q : Quit")
-    print(f"\nStarting tracking with profile: {current_profile.name}")
-    print(f"Starting mode: {core.mode}")
+    print(f"\nActive profile: {current_profile_name}")
+    print(f"Mode: {core.mode}")
+    print(f"Invert: X={core.invert_x}, Y={core.invert_y}")
+    print(f"Config file: config.yaml")
+    print(f"Calibration file: {CAL_FILE}")
 
-    mouse_control_enabled = True
     last_processed_time = time.time()
 
     # Edge-trigger keys
@@ -599,14 +599,13 @@ def main():
     key_p = EdgeKey()
     key_m = EdgeKey()
 
-    # Track calibration completion to auto-save
     prev_calibrating = False
 
     try:
         while camera.is_opened():
             now = time.time()
 
-            # Frame rate limiting (profile-specific)
+            # Frame rate limiting
             if now - last_processed_time < PROCESS_INTERVAL:
                 time.sleep(0.001)
                 continue
@@ -620,14 +619,12 @@ def main():
 
             landmarks_frame, landmarks_list_3d = face_detector.get_landmarks_as_pixels(frame)
 
-            # Defaults for display
             yaw_deg = 0.0
             pitch_deg = 0.0
             screen_x = None
             screen_y = None
 
             if landmarks_list_3d:
-                # Build dict
                 landmarks_dict = {idx: (x, y, z) for idx, x, y, z in landmarks_list_3d}
 
                 if SHOW_LANDMARKS:
@@ -652,7 +649,6 @@ def main():
                         x, y, z = landmarks_dict[idx]
                         key_points_3d[name] = np.array([float(x), float(y), float(z)], dtype=float)
 
-                    # Head orientation
                     orientation = head_tracker.calculate_head_orientation(key_points_3d)
 
                     # Update smoothing buffers (HeadTracker internal averaging)
@@ -664,7 +660,7 @@ def main():
                     yaw_deg = wrap_deg(yaw_deg)
                     pitch_deg = wrap_deg(pitch_deg)
 
-                    # Control core -> cursor target
+                    # Control -> cursor target
                     should_send, fx, fy, dbg = core.update(yaw_deg, pitch_deg, now=now)
                     screen_x, screen_y = fx, fy
 
@@ -684,7 +680,7 @@ def main():
                         )
                         face_detector.draw_head_cube(frame, cube_corners)
 
-                    # Visualization: gaze ray
+                    # Visualization: ray
                     if SHOW_GAZE_RAY:
                         ray_origin_2d = smoothed_origin[:2]
                         ray_dir_2d = smoothed_direction[:2]
@@ -701,14 +697,14 @@ def main():
                         cv2.circle(frame, (x, y), 3, (255, 0, 255), -1)
 
             # UI overlays
-            cv2.putText(frame, f"Yaw: {yaw_deg:+.1f}°, Pitch: {pitch_deg:+.1f}°",
+            cv2.putText(frame, f"Yaw: {yaw_deg:+.1f}, Pitch: {pitch_deg:+.1f}",
                         (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
             cv2.putText(frame, f"Mouse: {'ON' if mouse_control_enabled else 'OFF'}",
                         (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
                         (0, 255, 0) if mouse_control_enabled else (0, 0, 255), 2)
 
-            cv2.putText(frame, f"Profile: {current_profile.name}",
+            cv2.putText(frame, f"Profile: {current_profile_name}",
                         (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
             cv2.putText(frame, f"Mode: {core.mode.upper()}",
@@ -718,18 +714,15 @@ def main():
                 cv2.putText(frame, f"Screen: ({screen_x:.0f}, {screen_y:.0f})",
                             (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-            # Calibration progress overlay
             if core.cal_mgr.is_calibrating:
                 c, n = core.cal_mgr.progress()
                 cv2.putText(frame, f"CALIBRATING: {c}/{n}",
                             (10, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
-            # FPS
             fps = camera.get_frame_rate()
             cv2.putText(frame, f"FPS: {fps}", (10, cam_height - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
-            # Show windows
             cv2.imshow("Head Tracking Mouse Control", frame)
             cv2.imshow("Facial Landmarks", landmarks_frame)
 
@@ -742,31 +735,26 @@ def main():
 
             if key_c.rising(keyboard.is_pressed("c")):
                 if not core.cal_mgr.is_calibrating:
-                    core.start_calibration(num_samples=30)
+                    core.start_calibration(CAL_SAMPLES)
 
             if key_p.rising(keyboard.is_pressed("p")):
-                current_profile = SmoothingProfiles.cycle_profile(current_profile)
-
-                # Apply profile parameters
-                PROCESS_INTERVAL = float(current_profile.process_interval)
-                core.set_profile(current_profile)
-
-                # Resize head smoothing buffers WITHOUT resetting calibration/state
-                resize_headtracker_buffers(head_tracker, int(current_profile.filter_length))
-
-                print(f"[Profile] Switched to {current_profile.name}")
+                profile_idx = (profile_idx + 1) % len(PROFILE_ORDER)
+                current_profile_name = PROFILE_ORDER[profile_idx]
+                eff = get_effective_config(cfg, current_profile_name)
+                PROCESS_INTERVAL = apply_effective_config(eff, head_tracker, core)
+                print(f"[Profile] Switched to {current_profile_name} (process_interval={PROCESS_INTERVAL})")
 
             if key_m.rising(keyboard.is_pressed("m")):
                 core.toggle_mode()
                 print(f"[Mode] Switched to {core.mode}")
 
-            # Auto-save calibration right after it finishes
-            if prev_calibrating and (not core.cal_mgr.is_calibrating):
-                if core.cal_mgr.save(CALIBRATION_FILE):
-                    print(f"[Calibration] Saved to {CALIBRATION_FILE}")
+            # Auto-save calibration when it finishes
+            if prev_calibrating and (not core.cal_mgr.is_calibrating) and CAL_AUTOSAVE:
+                if core.cal_mgr.save(CAL_FILE):
+                    print(f"[Calibration] Saved to {CAL_FILE}")
             prev_calibrating = core.cal_mgr.is_calibrating
 
-            # Quit via window or 'q'
+            # Quit
             k = cv2.waitKey(1) & 0xFF
             if k == ord("q") or cv2.getWindowProperty("Head Tracking Mouse Control", cv2.WND_PROP_VISIBLE) < 1:
                 break
