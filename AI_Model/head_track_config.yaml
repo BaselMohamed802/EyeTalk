@@ -1,0 +1,113 @@
+tracking:
+  yaw_range: 20
+  pitch_range: 10
+  filter_length: 8
+
+  invert_x: true
+  invert_y: true
+
+  min_detection_confidence: 0.5
+  min_tracking_confidence: 0.5
+
+smoothing:
+  process_interval: 0.01
+
+control:
+  default_mode: absolute         # absolute | relative
+  start_mouse_enabled: true
+
+  movement_threshold_px: 0.5
+  pixel_deadzone_radius: 2.0
+
+  relative:
+    max_speed_px_per_s: 1800.0
+    deadzone_deg: 1.5
+    expo: 1.6
+
+filter:
+  type: kalman                   # kalman | ema
+
+  ema:
+    alpha: 0.55
+
+  kalman:
+    dt: 1.0
+    process_noise: 0.002
+    measurement_noise: 0.08
+
+profiles:
+  active: BALANCED               # FAST | BALANCED | SMOOTH
+
+  FAST:
+    tracking:
+      filter_length: 6
+      yaw_range: 18
+      pitch_range: 9
+    smoothing:
+      process_interval: 0.006
+    control:
+      movement_threshold_px: 0.3
+      pixel_deadzone_radius: 1.0
+      relative:
+        max_speed_px_per_s: 2200
+        deadzone_deg: 1.2
+        expo: 1.4
+    filter:
+      type: ema
+      ema:
+        alpha: 0.60
+
+  BALANCED:
+    tracking:
+      filter_length: 8
+      yaw_range: 20
+      pitch_range: 10
+    smoothing:
+      process_interval: 0.010
+    control:
+      movement_threshold_px: 0.5
+      pixel_deadzone_radius: 2.0
+      relative:
+        max_speed_px_per_s: 1800
+        deadzone_deg: 1.5
+        expo: 1.6
+    filter:
+      type: kalman
+      kalman:
+        dt: 1.0
+        process_noise: 0.002
+        measurement_noise: 0.08
+
+  SMOOTH:
+    tracking:
+      filter_length: 12
+      yaw_range: 24
+      pitch_range: 12
+    smoothing:
+      process_interval: 0.014
+    control:
+      movement_threshold_px: 0.8
+      pixel_deadzone_radius: 2.5
+      relative:
+        max_speed_px_per_s: 1500
+        deadzone_deg: 1.8
+        expo: 1.8
+    filter:
+      type: kalman
+      kalman:
+        dt: 1.0
+        process_noise: 0.0008
+        measurement_noise: 0.12
+
+calibration:
+  file: head_calibration.json
+  autosave: true
+  samples: 30
+
+mouse:
+  update_interval: 0.01
+
+display:
+  show_landmarks: true
+  show_cube: true
+  show_gaze_ray: true
