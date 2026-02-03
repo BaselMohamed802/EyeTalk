@@ -7,7 +7,7 @@ Each button press appends characters to form words and sentences.
 from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton
 from TTS_Engine import TTS 
 
-class Main_GUI_Window(QWidget):
+class Widget_EN(QWidget):
     """
     Main widget class that implements a virtual keyboard.
     Allows users to type text by clicking letter buttons.
@@ -63,7 +63,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -80,7 +80,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -97,7 +97,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -114,7 +114,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -131,7 +131,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -148,7 +148,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -165,7 +165,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -182,7 +182,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -199,7 +199,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -216,7 +216,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -234,7 +234,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: white;
                 background-color: #dc3545;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #bd2130;
                 border-radius: 5px;
                 font-weight: bold;
@@ -256,7 +256,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -273,7 +273,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -290,7 +290,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -307,7 +307,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -324,7 +324,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -341,7 +341,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -358,7 +358,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -375,7 +375,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -392,7 +392,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -410,7 +410,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: white;
                 background-color: #28a745;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #1e7e34;
                 border-radius: 5px;
                 font-weight: bold;
@@ -432,7 +432,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -449,7 +449,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -466,7 +466,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -483,7 +483,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -500,7 +500,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -517,7 +517,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -534,7 +534,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: black;
                 background-color: #f8f9fa;
-                padding: 10px;
+                padding: 20px;
                 border: 2px solid #dee2e6;
                 border-radius: 5px;
                 font-weight: bold;
@@ -552,7 +552,7 @@ class Main_GUI_Window(QWidget):
             QPushButton {
                 color: white;
                 background-color: #007bff;
-                padding: 10px 20px;
+                padding: 20px 20px;
                 border: 2px solid #0056b3;
                 border-radius: 5px;
                 font-weight: bold;
@@ -569,23 +569,23 @@ class Main_GUI_Window(QWidget):
     
         EM1_Button = QPushButton("I Feel Pain!!")
         EM1_Button.clicked.connect(self.Display_Letter)  
-        EM1_Button.setStyleSheet("color: white; background-color: #dc3545; padding: 8px; border: 2px solid #bd2130; border-radius: 10px; font-weight: bold; font-size: 14px;}")
+        EM1_Button.setStyleSheet("color: white; background-color: #dc3545; padding: 10px; border: 2px solid #bd2130; border-radius: 10px; font-weight: bold; font-size: 14px;}")
         
         EM2_Button = QPushButton("I Need Water")
         EM2_Button.clicked.connect(self.Display_Letter)
-        EM2_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 8px; text-align: center;")
+        EM2_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 10px; text-align: center;")
         
         EM3_Button = QPushButton("I Want Doctor")
         EM3_Button.clicked.connect(self.Display_Letter)
-        EM3_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 8px; text-align: center;")
+        EM3_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 10px; text-align: center;")
         
         EM4_Button = QPushButton("Leave me Alone")
         EM4_Button.clicked.connect(self.Display_Letter)
-        EM4_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 8px; text-align: center;")
+        EM4_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 10px; text-align: center;")
         
         EM5_Button = QPushButton("Clear The screen")
         EM5_Button.clicked.connect(self.Clear_Whole_Text)
-        EM5_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 8px; text-align: center;")
+        EM5_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 10px; text-align: center;")
         
         # ============================================
         # LAYOUT SETUP - ORGANIZING THE INTERFACE
