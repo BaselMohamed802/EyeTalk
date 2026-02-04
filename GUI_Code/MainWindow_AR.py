@@ -696,7 +696,7 @@ class Widget_AR(QWidget):
         EM3_Button.clicked.connect(self.Display_Letter)
         EM3_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 10px; text-align: center;")
         
-        EM4_Button = QPushButton("اترقني في حالي")
+        EM4_Button = QPushButton("اتركني في حالي")
         EM4_Button.clicked.connect(self.Display_Letter)
         EM4_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 10px; text-align: center;")
         
@@ -831,6 +831,9 @@ class Widget_AR(QWidget):
             self.text_holder_label.setText(f"{self.current_text}")
 
     def Text_To_Speech(self):
-         # Speak whatever is in current_text
-            self.tts.speak(self.current_text)
+     # Get the typed text
+        text_to_speak = self.current_text.strip()  # Your text
     
+        if text_to_speak:
+            # SPEAK IT
+         self.tts.speak(text_to_speak)
