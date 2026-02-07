@@ -498,7 +498,7 @@ def main():
     print("Head Tracking Mouse Control System (Config-driven)")
     print("=================================================")
 
-    cfg = load_config("config_head_tracking.yaml")
+    cfg = load_config("config.yaml")
 
     # Display
     SHOW_LANDMARKS = bool(cfg["display"].get("show_landmarks", True))
