@@ -27,6 +27,7 @@ import os
 import json
 import math
 import time
+import sys
 import threading
 from dataclasses import dataclass, asdict
 from collections import deque
@@ -39,6 +40,14 @@ import keyboard
 # -----------------------------
 # Module Imports
 # -----------------------------
+
+# --- Project-level imports (parent / root) ---
+# We add project root to sys.path so CursorIrisTracking can import shared modules.
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(THIS_DIR, ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 try:
     from VisionModule.camera import IrisCamera, print_camera_info
     from VisionModule.face_utils import FaceMeshDetector

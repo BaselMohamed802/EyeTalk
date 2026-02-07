@@ -111,22 +111,3 @@ display:
   show_landmarks: true
   show_cube: true
   show_gaze_ray: true
-
-gaze:
-  camera_index: 0
-  frame_w: 640
-  frame_h: 480
-  mirrored_input: false
-  clamp_margin_px: 10
-
-  filter_type: "ema"
-  filter_kwargs:
-    alpha: 0.35
-
-  show_debug: true
-
-  calibration_defaults:
-    scale_x: 2.0
-    scale_y: 2.0
-    gamma_x: 1.0
-    gamma_y: 1.0
