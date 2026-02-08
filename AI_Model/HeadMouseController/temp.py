@@ -70,7 +70,7 @@ face_mesh = mp_face_mesh.FaceMesh(
 )
 
 # === Open webcam ===
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
@@ -81,7 +81,7 @@ nose_indices = [4, 45, 275, 220, 440, 1, 5, 51, 281, 44, 274, 241,
                 3, 248]
 
 # ===== NEW: File writing for screen position =====
-screen_position_file = r"G:\Thebes Higher Institue of Engineering\Final Project\EyeTalk\AI_Model\screen_position.txt"
+screen_position_file = r"G:\Thebes Higher Institue of Engineering\Final Project\EyeTalk\AI_Model\HeadMouseController\screen_position.txt"
 def write_screen_position(x, y):
     """Write screen position to file, overwriting the same line"""
     with open(screen_position_file, 'w') as f:
