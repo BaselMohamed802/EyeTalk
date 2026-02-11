@@ -15,7 +15,7 @@ MONITOR_WIDTH, MONITOR_HEIGHT = pyautogui.size()
 CENTER_X = MONITOR_WIDTH // 2
 CENTER_Y = MONITOR_HEIGHT // 2
 mouse_control_enabled = False
-filter_length = 10
+filter_length = 20
 gaze_length = 350
 
 # --- Orbit camera state for the debug view ---
