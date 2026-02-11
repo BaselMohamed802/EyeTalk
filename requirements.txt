@@ -5,3 +5,5 @@ matplotlib
 pyautogui
 Pyside6
 screeninfo
+pyyaml
+keyboard

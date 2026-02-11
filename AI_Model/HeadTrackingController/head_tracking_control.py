@@ -6,17 +6,13 @@ Date: 2/1/2026
 Description:
     Head Tracking Mouse Control System (Config-driven, FULL SCRIPT)
 
-    Main Features:
-      - All tuning now lives in config.yaml (including per-profile overrides)
-      - Continuous yaw/pitch [-180,+180] + wrap-safe subtraction
-      - Calibration is robust (median), UI progress, persistent save/load
-      - Cursor-space filtering (EMA/Kalman) controlled from config
-      - Profile switching preserves state (no HeadTracker re-instantiation)
-      - Edge-trigger hotkeys (no debounce sleeps)
-      - Absolute + Relative modes
+    Linux/RPi compatibility update:
+      - Removed `keyboard` library (requires root on Linux)
+      - Hotkeys handled via OpenCV `cv2.waitKey()` (works without sudo)
+      - Config/calibration paths resolved relative to script directory
 
-Hotkeys:
-  F7 : Toggle mouse control
+Hotkeys (OpenCV window must be focused):
+  7  : Toggle mouse control   (F7 is not reliable in OpenCV on Linux)
   C  : Calibrate (uses calibration.samples)
   P  : Cycle profiles (FAST -> BALANCED -> SMOOTH)
   M  : Toggle mode (absolute <-> relative)
@@ -35,14 +31,12 @@ from collections import deque
 import cv2
 import numpy as np
 import yaml
-import keyboard
 
 # -----------------------------
 # Module Imports
 # -----------------------------
 
 # --- Project-level imports (parent / root) ---
-# We add project root to sys.path so CursorIrisTracking can import shared modules.
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(THIS_DIR, ".."))
 if PROJECT_ROOT not in sys.path:
@@ -53,13 +47,13 @@ try:
     from VisionModule.face_utils import FaceMeshDetector
     from VisionModule.head_tracking import HeadTracker
     from PyautoguiController.mouse_controller import MouseController
+    from Filters.filterManager import FilterManager
 except Exception:
     from camera import IrisCamera, print_camera_info
     from face_utils import FaceMeshDetector
     from head_tracking import HeadTracker
     from mouse_controller import MouseController
-
-from Filters.filterManager import FilterManager
+    from filterManager import FilterManager
 
 
 # -----------------------------
@@ -75,6 +69,9 @@ FACE_OUTLINE_INDICES = [
 
 PROFILE_ORDER = ["FAST", "BALANCED", "SMOOTH"]
 
+WINDOW_MAIN = "Head Tracking Mouse Control"
+WINDOW_LANDMARKS = "Facial Landmarks"
+
 
 # -----------------------------
 # Config utilities
@@ -88,6 +85,24 @@ def deep_merge(base: dict, override: dict) -> dict:
         else:
             out[k] = v
     return out
+
+
+def _find_config_path(filename: str = "config.yaml") -> str | None:
+    """
+    Try to find config.yaml in common locations:
+      1) next to this script
+      2) project root (parent of THIS_DIR)
+      3) current working directory
+    """
+    candidates = [
+        os.path.join(THIS_DIR, filename),
+        os.path.join(PROJECT_ROOT, filename),
+        os.path.join(os.getcwd(), filename),
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return None
 
 
 def load_config(path: str = "config.yaml") -> dict:
@@ -128,9 +143,16 @@ def load_config(path: str = "config.yaml") -> dict:
         "display": {"show_landmarks": True, "show_cube": True, "show_gaze_ray": True},
     }
 
+    # Resolve config path robustly if given a bare filename
+    cfg_path = path
+    if not os.path.isabs(cfg_path):
+        found = _find_config_path(os.path.basename(cfg_path))
+        cfg_path = found if found else cfg_path
+
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(cfg_path, "r", encoding="utf-8") as f:
             user_cfg = yaml.safe_load(f) or {}
+        print(f"[Config] Loaded: {cfg_path}")
         return deep_merge(defaults, user_cfg)
     except FileNotFoundError:
         print("[Config] config.yaml not found. Using defaults.")
@@ -145,19 +167,6 @@ def get_effective_config(cfg: dict, profile_name: str) -> dict:
     profiles = cfg.get("profiles", {}) or {}
     prof_block = (profiles.get(profile_name, {}) or {})
     return deep_merge(cfg, prof_block)
-
-
-# -----------------------------
-# Edge-trigger key helper (no debounce sleeps)
-# -----------------------------
-class EdgeKey:
-    def __init__(self):
-        self.prev = False
-
-    def rising(self, pressed_now: bool) -> bool:
-        fired = (not self.prev) and pressed_now
-        self.prev = pressed_now
-        return fired
 
 
 # -----------------------------
@@ -223,10 +232,6 @@ class CalibrationManager:
         return len(self._yaw_samples), self._target_n
 
     def finish(self):
-        if not self._yaw_samples:
-            self._calibrating = False
-            return
-
         ys = sorted(self._yaw_samples)
         ps = sorted(self._pitch_samples)
         mid = len(ys) // 2
@@ -377,7 +382,7 @@ class HeadControlCore:
         dyaw = angle_diff_deg(yaw, self.cal_mgr.cal.center_yaw_deg)
         dpitch = angle_diff_deg(pitch, self.cal_mgr.cal.center_pitch_deg)
 
-        # Apply inversion (you confirmed this was needed)
+        # Apply inversion
         if self.invert_x:
             dyaw = -dyaw
         if self.invert_y:
@@ -516,9 +521,14 @@ def main():
 
     # Calibration config
     cal_cfg = cfg.get("calibration", {}) or {}
-    CAL_FILE = str(cal_cfg.get("file", "head_calibration.json"))
+    cal_file_cfg = str(cal_cfg.get("file", "head_calibration.json"))
     CAL_AUTOSAVE = bool(cal_cfg.get("autosave", True))
     CAL_SAMPLES = int(cal_cfg.get("samples", 30))
+
+    # Resolve calibration file path relative to script if it is relative
+    CAL_FILE = cal_file_cfg
+    if not os.path.isabs(CAL_FILE):
+        CAL_FILE = os.path.join(THIS_DIR, CAL_FILE)
 
     # Starting profile
     active_profile = str((cfg.get("profiles", {}) or {}).get("active", "BALANCED")).upper()
@@ -588,8 +598,8 @@ def main():
     mouse_lock = threading.Lock()
 
     # Controls
-    print("\nHotkeys:")
-    print("  F7: Toggle mouse control")
+    print("\nHotkeys (focus the OpenCV window):")
+    print("  7 : Toggle mouse control (F7 not reliable on Linux OpenCV)")
     print("  C : Calibrate")
     print("  P : Cycle profiles (FAST/BALANCED/SMOOTH)")
     print("  M : Toggle mode (absolute/relative)")
@@ -597,17 +607,9 @@ def main():
     print(f"\nActive profile: {current_profile_name}")
     print(f"Mode: {core.mode}")
     print(f"Invert: X={core.invert_x}, Y={core.invert_y}")
-    print(f"Config file: config.yaml")
     print(f"Calibration file: {CAL_FILE}")
 
     last_processed_time = time.time()
-
-    # Edge-trigger keys
-    key_f7 = EdgeKey()
-    key_c = EdgeKey()
-    key_p = EdgeKey()
-    key_m = EdgeKey()
-
     prev_calibrating = False
 
     try:
@@ -732,30 +734,37 @@ def main():
             cv2.putText(frame, f"FPS: {fps}", (10, cam_height - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
-            cv2.imshow("Head Tracking Mouse Control", frame)
-            cv2.imshow("Facial Landmarks", landmarks_frame)
+            cv2.imshow(WINDOW_MAIN, frame)
+            cv2.imshow(WINDOW_LANDMARKS, landmarks_frame)
 
-            # ---------
-            # Keyboard handling (edge-triggered)
-            # ---------
-            if key_f7.rising(keyboard.is_pressed("f7")):
-                mouse_control_enabled = not mouse_control_enabled
-                print(f"[Mouse Control] {'Enabled' if mouse_control_enabled else 'Disabled'}")
+            # -----------------------------
+            # Keyboard handling (OpenCV waitKey, cross-platform, no root)
+            # NOTE: window must be focused.
+            # -----------------------------
+            k = cv2.waitKey(1) & 0xFF
+            if k != 255:  # 255 means "no key" on many builds
+                if k == ord("q"):
+                    break
 
-            if key_c.rising(keyboard.is_pressed("c")):
-                if not core.cal_mgr.is_calibrating:
-                    core.start_calibration(CAL_SAMPLES)
+                # Toggle mouse control (use '7' on Pi/Linux)
+                if k == ord("7"):
+                    mouse_control_enabled = not mouse_control_enabled
+                    print(f"[Mouse Control] {'Enabled' if mouse_control_enabled else 'Disabled'}")
 
-            if key_p.rising(keyboard.is_pressed("p")):
-                profile_idx = (profile_idx + 1) % len(PROFILE_ORDER)
-                current_profile_name = PROFILE_ORDER[profile_idx]
-                eff = get_effective_config(cfg, current_profile_name)
-                PROCESS_INTERVAL = apply_effective_config(eff, head_tracker, core)
-                print(f"[Profile] Switched to {current_profile_name} (process_interval={PROCESS_INTERVAL})")
+                if k == ord("c"):
+                    if not core.cal_mgr.is_calibrating:
+                        core.start_calibration(CAL_SAMPLES)
 
-            if key_m.rising(keyboard.is_pressed("m")):
-                core.toggle_mode()
-                print(f"[Mode] Switched to {core.mode}")
+                if k == ord("p"):
+                    profile_idx = (profile_idx + 1) % len(PROFILE_ORDER)
+                    current_profile_name = PROFILE_ORDER[profile_idx]
+                    eff = get_effective_config(cfg, current_profile_name)
+                    PROCESS_INTERVAL = apply_effective_config(eff, head_tracker, core)
+                    print(f"[Profile] Switched to {current_profile_name} (process_interval={PROCESS_INTERVAL})")
+
+                if k == ord("m"):
+                    core.toggle_mode()
+                    print(f"[Mode] Switched to {core.mode}")
 
             # Auto-save calibration when it finishes
             if prev_calibrating and (not core.cal_mgr.is_calibrating) and CAL_AUTOSAVE:
@@ -763,9 +772,8 @@ def main():
                     print(f"[Calibration] Saved to {CAL_FILE}")
             prev_calibrating = core.cal_mgr.is_calibrating
 
-            # Quit
-            k = cv2.waitKey(1) & 0xFF
-            if k == ord("q") or cv2.getWindowProperty("Head Tracking Mouse Control", cv2.WND_PROP_VISIBLE) < 1:
+            # Window closed
+            if cv2.getWindowProperty(WINDOW_MAIN, cv2.WND_PROP_VISIBLE) < 1:
                 break
 
     except KeyboardInterrupt:
