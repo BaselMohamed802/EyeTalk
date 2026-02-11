@@ -12,6 +12,10 @@ tracking:
 smoothing:
   process_interval: 0.01
 
+# =======================================
+#          Control Type Section
+# =======================================
+
 control:
   default_mode: absolute         # absolute | relative
   start_mouse_enabled: true
@@ -23,6 +27,22 @@ control:
     max_speed_px_per_s: 1800.0
     deadzone_deg: 1.5
     expo: 1.6
+
+# =======================================
+#            HotKeys Section
+# =======================================
+
+hotkeys:
+  # NOTE: with OpenCV waitKey, the OpenCV window must be focused.
+  toggle_mouse: "7"     # was F7 on Windows; "7" is reliable on Linux/OpenCV
+  calibrate: "c"
+  cycle_profile: "p"
+  toggle_mode: "m"
+  quit: "q"
+
+# =======================================
+#            Filters Section
+# =======================================
 
 filter:
   type: kalman                   # kalman | ema

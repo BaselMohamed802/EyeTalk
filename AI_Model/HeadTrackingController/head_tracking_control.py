@@ -597,13 +597,31 @@ def main():
     # Thread lock for mouse updates
     mouse_lock = threading.Lock()
 
-    # Controls
+    # -----------------------------
+    # Hotkeys (from config.yaml)
+    # -----------------------------
+    hk = (cfg.get("hotkeys", {}) or {})
+    KEY_TOGGLE = str(hk.get("toggle_mouse", "7")).lower()
+    KEY_CALIB  = str(hk.get("calibrate", "c")).lower()
+    KEY_PROF   = str(hk.get("cycle_profile", "p")).lower()
+    KEY_MODE   = str(hk.get("toggle_mode", "m")).lower()
+    KEY_QUIT   = str(hk.get("quit", "q")).lower()
+
+    def _key_match(k: int, key: str) -> bool:
+        # OpenCV gives ASCII for regular keys; support "space"
+        if key in ("space", " "):
+            return k == 32
+        if not key:
+            return False
+        return k == ord(key[0])
+
     print("\nHotkeys (focus the OpenCV window):")
-    print("  7 : Toggle mouse control (F7 not reliable on Linux OpenCV)")
-    print("  C : Calibrate")
-    print("  P : Cycle profiles (FAST/BALANCED/SMOOTH)")
-    print("  M : Toggle mode (absolute/relative)")
-    print("  Q : Quit")
+    print(f"  {KEY_TOGGLE.upper()} : Toggle mouse control")
+    print(f"  {KEY_CALIB.upper()} : Calibrate")
+    print(f"  {KEY_PROF.upper()} : Cycle profiles (FAST/BALANCED/SMOOTH)")
+    print(f"  {KEY_MODE.upper()} : Toggle mode (absolute/relative)")
+    print(f"  {KEY_QUIT.upper()} : Quit")
+
     print(f"\nActive profile: {current_profile_name}")
     print(f"Mode: {core.mode}")
     print(f"Invert: X={core.invert_x}, Y={core.invert_y}")
@@ -742,27 +760,26 @@ def main():
             # NOTE: window must be focused.
             # -----------------------------
             k = cv2.waitKey(1) & 0xFF
-            if k != 255:  # 255 means "no key" on many builds
-                if k == ord("q"):
+            if k != 255:
+                if _key_match(k, KEY_QUIT):
                     break
 
-                # Toggle mouse control (use '7' on Pi/Linux)
-                if k == ord("7"):
+                if _key_match(k, KEY_TOGGLE):
                     mouse_control_enabled = not mouse_control_enabled
                     print(f"[Mouse Control] {'Enabled' if mouse_control_enabled else 'Disabled'}")
 
-                if k == ord("c"):
+                if _key_match(k, KEY_CALIB):
                     if not core.cal_mgr.is_calibrating:
                         core.start_calibration(CAL_SAMPLES)
 
-                if k == ord("p"):
+                if _key_match(k, KEY_PROF):
                     profile_idx = (profile_idx + 1) % len(PROFILE_ORDER)
                     current_profile_name = PROFILE_ORDER[profile_idx]
                     eff = get_effective_config(cfg, current_profile_name)
                     PROCESS_INTERVAL = apply_effective_config(eff, head_tracker, core)
                     print(f"[Profile] Switched to {current_profile_name} (process_interval={PROCESS_INTERVAL})")
 
-                if k == ord("m"):
+                if _key_match(k, KEY_MODE):
                     core.toggle_mode()
                     print(f"[Mode] Switched to {core.mode}")
 
