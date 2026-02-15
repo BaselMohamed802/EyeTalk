@@ -15,7 +15,7 @@ MONITOR_WIDTH, MONITOR_HEIGHT = pyautogui.size()
 CENTER_X = MONITOR_WIDTH // 2
 CENTER_Y = MONITOR_HEIGHT // 2
 mouse_control_enabled = False
-filter_length = 10
+filter_length = 20
 gaze_length = 350
 
 # --- Orbit camera state for the debug view ---
@@ -70,7 +70,7 @@ face_mesh = mp_face_mesh.FaceMesh(
 )
 
 # === Open webcam ===
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
 w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 

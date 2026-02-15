@@ -834,6 +834,7 @@ class Widget_AR(QWidget):
      # Get the typed text
         text_to_speak = self.current_text.strip()  # Your text
     
+    def Text_To_Speech(self):
+        text_to_speak = self.current_text.strip()
         if text_to_speak:
-            # SPEAK IT
-         self.tts.speak(text_to_speak)
+            self.tts.speak(text_to_speak)
