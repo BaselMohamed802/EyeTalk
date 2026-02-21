@@ -5,6 +5,8 @@ Each button press appends characters to form words and sentences.
 """
 
 from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton
+from PySide6.QtCore import Signal, Qt
+from PySide6.QtGui import QPixmap
 from TTS_Engine import TTS 
 
 class Widget_EN(QWidget):
@@ -13,6 +15,9 @@ class Widget_EN(QWidget):
     Allows users to type text by clicking letter buttons.
 
     """
+    
+    Language_Change_req = Signal() # Signal Handler 
+
     def __init__(self):
         """Initialize the widget and set up the virtual keyboard interface."""
         super().__init__()  # Initialize parent QWidget class
@@ -20,23 +25,30 @@ class Widget_EN(QWidget):
         # ============================================
         # WINDOW SETUP
         # ============================================
-        self.setWindowTitle("EyeTalk")  # Set window title
         self.current_text = ""  # Variable to store the typed text (starts empty)
-        
+
         # ============================================
         # TEXT DISPLAY AREA
         # ============================================
-        
+
+        #Calling the text-to-speech class 
         self.tts = TTS()
+
+        #Creating a Label to hold Thebes's Logo 
+        Thebes_Logo = QPixmap(r"M:\University\Level 4\Shit_Project\EyeTalk\GUI_Code\Eye_Talk_Logo.png")
+        Thebes_Label = QLabel(self)
+
+        Scaled = Thebes_Logo.scaled(600, 500,Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        Thebes_Label.setPixmap(Scaled)
+
         # Label to show "Your Text:" prompt
-        Display_Label = QLabel("Your Text:")
+        Display_Label = QLabel("Your Text")
         Display_Label.setStyleSheet("""
         QLabel {
-            padding: 15px;
+            color: #FF4500;
+            qproperty-alignment: AlignCenter;
             font-size: 20px;
-            min-width: 200px;
-            min-height: 100px;
-            border-radius: 8px;
+            max-height: 20px;
         }
     """)
 
@@ -45,10 +57,10 @@ class Widget_EN(QWidget):
         self.text_holder_label.setStyleSheet("""
         QLabel {
             padding: 15px;
-            font-size: 20px;
-            min-width: 300px;
-            min-height: 100px;
+            font-size: 25px;
+            max-height: 2000px;
             border-radius: 8px;
+            background-color: #75706f;
         }
     """)
     
@@ -64,7 +76,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -81,7 +93,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -98,7 +110,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -115,7 +127,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -132,7 +144,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -149,7 +161,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -166,7 +178,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -183,7 +195,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -200,7 +212,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -217,7 +229,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -235,7 +247,7 @@ class Widget_EN(QWidget):
                 color: white;
                 background-color: #dc3545;
                 padding: 20px;
-                border: 2px solid #bd2130;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 14px;
@@ -246,7 +258,7 @@ class Widget_EN(QWidget):
         """)
 
         # ============================================
-        # KEYBOARD BUTTONS - ROW 2 (ASDFGHJKL)
+        # KEYBOARD BUTTONS - ROW 2px (ASDFGHJKL)
         # ============================================
         # Create buttons for letters A through L (middle row of keyboard)
 
@@ -257,7 +269,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -274,7 +286,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -291,7 +303,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -308,7 +320,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -325,7 +337,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -342,7 +354,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -359,7 +371,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -376,7 +388,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -393,7 +405,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -411,7 +423,7 @@ class Widget_EN(QWidget):
                 color: white;
                 background-color: #28a745;
                 padding: 20px;
-                border: 2px solid #1e7e34;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 14px;
@@ -433,7 +445,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -450,7 +462,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -467,7 +479,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -484,7 +496,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -501,7 +513,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -518,7 +530,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -535,7 +547,7 @@ class Widget_EN(QWidget):
                 color: black;
                 background-color: #f8f9fa;
                 padding: 20px;
-                border: 2px solid #dee2e6;
+                border: 2px solid #0c0c0d;
                 border-radius: 5px;
                 font-weight: bold;
                 font-size: 16px;
@@ -573,19 +585,23 @@ class Widget_EN(QWidget):
         
         EM2_Button = QPushButton("I Need Water")
         EM2_Button.clicked.connect(self.Display_Letter)
-        EM2_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 10px; text-align: center;")
+        EM2_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 10px; text-align: center; border: 2px solid #0056b3;")
         
         EM3_Button = QPushButton("I Want Doctor")
         EM3_Button.clicked.connect(self.Display_Letter)
-        EM3_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 10px; text-align: center;")
+        EM3_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 10px; text-align: center; border: 2px solid #0056b3;")
         
-        EM4_Button = QPushButton("Leave me Alone")
+        EM4_Button = QPushButton("I Want To Eat")
         EM4_Button.clicked.connect(self.Display_Letter)
-        EM4_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 10px; text-align: center;")
+        EM4_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 10px; text-align: center; border: 2px solid #0056b3;")
         
         EM5_Button = QPushButton("Clear The screen")
         EM5_Button.clicked.connect(self.Clear_Whole_Text)
-        EM5_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 10px; text-align: center;")
+        EM5_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 10px; text-align: center; border: 2px solid #0056b3;")
+
+        EM6_Button = QPushButton("EN <-> AR")
+        EM6_Button.clicked.connect(self.Change_Lang)
+        EM6_Button.setStyleSheet("background-color: #357bdc; color: white; font-weight: bold;font-size: 14px; border-radius: 10px; padding: 10px; text-align: center; border: 2px solid #0056b3;")
         
         # ============================================
         # LAYOUT SETUP - ORGANIZING THE INTERFACE
@@ -600,16 +616,23 @@ class Widget_EN(QWidget):
         Vertical_EM_Button.addWidget(EM3_Button)
         Vertical_EM_Button.addWidget(EM4_Button)
         Vertical_EM_Button.addWidget(EM5_Button)
+        Vertical_EM_Button.addWidget(EM6_Button)
+
+
+        Vertical_TextArea = QVBoxLayout()
+        Vertical_TextArea.addWidget(Thebes_Label)
+        Vertical_TextArea.addWidget(Display_Label)
+        Vertical_TextArea.addWidget(self.text_holder_label)
+
         
         # HORIZONTAL LAYOUT: Text display area
         # Contains the "Your Text:" label and the text display label
         H_layout = QHBoxLayout()
         H_layout.setSpacing(20)
         H_layout.addLayout(Vertical_EM_Button)
-        H_layout.addWidget(Display_Label)
-        H_layout.addWidget(self.text_holder_label)
+        H_layout.addLayout(Vertical_TextArea)
        
-        
+    
         # KEYBOARD ROW 1 LAYOUT: Q W E R T Y U I O P + Delete
         Keyboard_Layout_ROW1 = QHBoxLayout()
         Keyboard_Layout_ROW1.addWidget(Letter_ButtonQ)
@@ -624,7 +647,7 @@ class Widget_EN(QWidget):
         Keyboard_Layout_ROW1.addWidget(Letter_ButtonP)
         Keyboard_Layout_ROW1.addWidget(Letter_Button_Delete)
         
-        # KEYBOARD ROW 2 LAYOUT: A S D F G H J K L + Enter
+        # KEYBOARD ROW 2px LAYOUT: A S D F G H J K L + Enter
         Keyboard_Layout_ROW2 = QHBoxLayout()
         Keyboard_Layout_ROW2.addWidget(Letter_ButtonA)
         Keyboard_Layout_ROW2.addWidget(Letter_ButtonS)
@@ -655,7 +678,7 @@ class Widget_EN(QWidget):
         V_layout = QVBoxLayout()
         V_layout.addLayout(H_layout)           # Text display area
         V_layout.addLayout(Keyboard_Layout_ROW1)  # Keyboard row 1
-        V_layout.addLayout(Keyboard_Layout_ROW2)  # Keyboard row 2
+        V_layout.addLayout(Keyboard_Layout_ROW2)  # Keyboard row 2px
         V_layout.addLayout(Keyboard_Layout_ROW3)  # Keyboard row 3
         V_layout.addLayout(Keyboard_Layout_ROW4)  # Keyboard row 4 (space bar)
         
@@ -706,6 +729,13 @@ class Widget_EN(QWidget):
             self.text_holder_label.setText(f"{self.current_text}")
 
     def Text_To_Speech(self):
-         # Speak whatever is in current_text
-            self.tts.speak(self.current_text)
-    
+     # Get the typed text
+        text_to_speak = self.current_text.strip()  # Your text
+        if text_to_speak:
+            # SPEAK IT
+         self.tts.speak(text_to_speak)
+
+    def Change_Lang(self):
+     #Sends signals to change Language 
+            self.Language_Change_req.emit()
+            
