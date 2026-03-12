@@ -1,0 +1,4 @@
+Raspberry Pi wisecoco 10.1 inch capacitive touch screen case by MostlyBuilds on Thingiverse: https://www.thingiverse.com/thing:6537997
+
+Summary:
+This is a screen case for the wisecoco 10.1" capacitive touch screen. This is a super affordable touch screen that supports attaching a raspberry pi to the back.I designed this case to be printed in four separate pieces that connect together with screws and heat-set inserts:Main body frameBack coverTwo feetThe feet have a very aggressive angle, causing the screen to be almost vertical. This is specific to my use-case where I sit the screen on top of my HF radio that sits at an angle. Depending on your use case, you might want to redesign the feet.Refer to the linked youtube video for assembly instructions. The screen and all of the relevant parts are listed in the youtube video description.
