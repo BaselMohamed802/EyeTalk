@@ -43,9 +43,9 @@ def list_available_cameras(max_to_test=10):
                 'name': f'Camera {port}'
             }
             
-            print(f"✓ Camera found at port {port}: {width}x{height} ({fps} FPS)")
+            print(f"[OK] Camera found at port {port}: {width}x{height} ({fps} FPS)")
         else:
-            print(f"⚠ Camera at port {port} opens but cannot read frames")
+            print(f"[ERROR] Camera at port {port} opens but cannot read frames")
         
         cap.release()
     

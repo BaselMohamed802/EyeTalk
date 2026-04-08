@@ -111,6 +111,7 @@ def load_config(path: str = "config.yaml") -> dict:
     If missing, returns defaults (so code still runs).
     """
     defaults = {
+        "camera": {"id": 0, "resolution": "640x480"},
         "tracking": {
             "yaw_range": 20,
             "pitch_range": 10,
@@ -536,7 +537,7 @@ def main():
         active_profile = "BALANCED"
     profile_idx = PROFILE_ORDER.index(active_profile)
 
-    # 1) Camera selection
+    # 1) Camera selection (Auto-selects from Config)
     print("\nScanning for cameras...")
     cameras = print_camera_info()
     if not cameras:
@@ -544,17 +545,27 @@ def main():
         return
 
     camera_ports = list(cameras.keys())
-    if len(camera_ports) > 1:
-        print(f"\nAvailable cameras: {camera_ports}")
-        cam_id = int(input(f"Select camera port (default {camera_ports[0]}): ") or camera_ports[0])
-    else:
+    cam_cfg = cfg.get("camera", {})
+    config_cam_id = cam_cfg.get("id", None)
+    
+    if config_cam_id is not None and config_cam_id in camera_ports:
+        cam_id = config_cam_id
+        print(f"\nUsing configured camera at port {cam_id}")
+    elif len(camera_ports) > 0:
         cam_id = camera_ports[0]
-        print(f"\nUsing camera at port {cam_id}")
+        print(f"\nUsing default camera at port {cam_id}")
+
+    # Parse configured resolution
+    res_str = cam_cfg.get("resolution", "640x480")
+    try:
+        cam_w, cam_h = map(int, res_str.split('x'))
+    except Exception:
+        cam_w, cam_h = 640, 480
 
     # 2) Init modules
     print("\nInitializing components...")
     try:
-        camera = IrisCamera(cam_id, cam_width=640, cam_height=480)
+        camera = IrisCamera(cam_id, cam_width=cam_w, cam_height=cam_h)
     except Exception as e:
         print(f"Error initializing camera: {e}")
         return
@@ -811,6 +822,8 @@ def main():
             pass
         cv2.destroyAllWindows()
         print("Cleanup complete.")
+        # HARD EXIT: Forces python to exit instantly, killing any rogue/dangling threads
+        os._exit(0) 
 
 
 if __name__ == "__main__":

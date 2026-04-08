@@ -1,0 +1,10 @@
+1. Open CMD (NOT Powershell, Powershell will not work!!!!).
+2. Run the script using "python head_tracking_gui.py".
+ 
+
+
+ ==========================================================
+                    What to update next
+ ==========================================================
+
+1. The program does not quit gracefully at the end and hangs the CMD.
