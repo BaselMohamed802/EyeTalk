@@ -214,38 +214,99 @@ class ConfigControlFactory:
             else:
                 return ConfigControlFactory._create_spinbox(parent, param_name, value, description, callback, is_float=True)
         else:
-            # Fallback for unhandled types - create a descriptive label
+            # Fallback for unhandled types
+            main_layout = QVBoxLayout()
+            main_layout.setContentsMargins(0, 0, 0, 8)
+            
             label = QLabel(f"{description.name}: {str(value)}")
             label.setStyleSheet("background-color: #f0f0f0; padding: 5px; border-radius: 3px;")
-            label.setToolTip(description.description)
-            return label
+            main_layout.addWidget(label)
+            
+            desc_label = QLabel(description.description)
+            desc_label.setWordWrap(True)
+            desc_label.setStyleSheet("""
+                QLabel {
+                    color: #555555;
+                    font-size: 13px;
+                    padding: 6px 8px;
+                    background-color: #f9f9f9;
+                    border-left: 3px solid #2196f3;
+                    border-radius: 3px;
+                }
+            """)
+            main_layout.addWidget(desc_label)
+            
+            container = QWidget()
+            container.setLayout(main_layout)
+            return container
     
     @staticmethod
     def _create_checkbox(parent, param_name: str, value: bool, description: ConfigDescription, callback):
+        """Create a checkbox with full-width inline description below it."""
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 8)
+        main_layout.setSpacing(4)
+        
+        # Checkbox
         checkbox = QCheckBox(description.name)
         checkbox.setChecked(value)
         checkbox.stateChanged.connect(lambda state: callback(param_name, bool(state)))
+        main_layout.addWidget(checkbox)
         
-        # Add tooltip with description
-        tooltip = description.description
+        # Build description text
+        desc_lines = [description.description]
         if description.effect_increase and description.effect_decrease:
-            tooltip += f"\n\nChecked: {description.effect_increase}"
-            tooltip += f"\nUnchecked: {description.effect_decrease}"
-        checkbox.setToolTip(tooltip)
+            desc_lines.append(f"✓ ON: {description.effect_increase}")
+            desc_lines.append(f"☐ OFF: {description.effect_decrease}")
+        
+        desc_text = "\n".join(desc_lines)
+        
+        # Full-width description label
+        desc_label = QLabel(desc_text)
+        desc_label.setWordWrap(True)
+        desc_label.setStyleSheet("""
+            QLabel {
+                color: #555555;
+                font-size: 13px;
+                padding: 6px 8px;
+                background-color: #f9f9f9;
+                border-left: 3px solid #2196f3;
+                border-radius: 3px;
+                margin-top: 2px;
+            }
+        """)
+        main_layout.addWidget(desc_label)
         
         return checkbox
     
     @staticmethod
     def _create_combobox(parent, param_name: str, value: str, description: ConfigDescription, callback):
+        """Create a combobox with full-width inline description below it."""
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 8)
+        main_layout.setSpacing(4)
+        
+        # Create horizontal layout for label and combo
+        top_layout = QHBoxLayout()
+        
         combo = QComboBox()
         
         # Define choices based on parameter
         if param_name == "default_mode":
             choices = ["absolute", "relative"]
+            choice_descriptions = {
+                "absolute": "Cursor follows head position directly (1:1 mapping)",
+                "relative": "Head movement controls cursor speed (like a joystick)"
+            }
         elif param_name == "type":
             choices = ["kalman", "ema"]
+            choice_descriptions = {
+                "kalman": "Predictive filter - better for smooth, predictable movement",
+                "ema": "Simple exponential smoothing - faster response but less smooth"
+            }
         else:
             choices = [str(value)]
+            choice_descriptions = {}
         
         for choice in choices:
             combo.addItem(choice.capitalize(), choice)
@@ -258,29 +319,69 @@ class ConfigControlFactory:
             lambda: callback(param_name, combo.currentData())
         )
         
-        # Create layout with label
-        layout = QHBoxLayout()
         label = QLabel(description.name)
         label.setMinimumWidth(150)
-        label.setToolTip(description.description)
-        layout.addWidget(label)
-        layout.addWidget(combo)
+        top_layout.addWidget(label)
+        top_layout.addWidget(combo)
+        top_layout.addStretch()
+        
+        main_layout.addLayout(top_layout)
+        
+        # Full-width description
+        desc_lines = [description.description]
+        
+        # Add choice-specific description if available
+        current_choice = combo.currentData()
+        if current_choice in choice_descriptions:
+            desc_lines.append(f"Current selection ({current_choice}): {choice_descriptions[current_choice]}")
+        
+        desc_text = "\n".join(desc_lines)
+        
+        desc_label = QLabel(desc_text)
+        desc_label.setWordWrap(True)
+        desc_label.setStyleSheet("""
+            QLabel {
+                color: #555555;
+                font-size: 13px;
+                padding: 6px 8px;
+                background-color: #f9f9f9;
+                border-left: 3px solid #2196f3;
+                border-radius: 3px;
+                margin-top: 2px;
+            }
+        """)
+        main_layout.addWidget(desc_label)
+        
+        # Update description when combo changes
+        def update_description():
+            current = combo.currentData()
+            new_desc_lines = [description.description]
+            if current in choice_descriptions:
+                new_desc_lines.append(f"Current selection ({current}): {choice_descriptions[current]}")
+            desc_label.setText("\n".join(new_desc_lines))
+        
+        combo.currentIndexChanged.connect(update_description)
         
         container = QWidget()
-        container.setLayout(layout)
+        container.setLayout(main_layout)
         return container
     
     @staticmethod
     def _create_spinbox(parent, param_name: str, value: float, description: ConfigDescription,
                        callback, is_float: bool = True):
-        # Create layout
-        layout = QHBoxLayout()
+        """Create a spinbox with full-width inline description below it."""
+        # Create main vertical layout for the entire control
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 8)
+        main_layout.setSpacing(4)
+        
+        # Create horizontal layout for label and spinbox
+        top_layout = QHBoxLayout()
         
         # Label
         label = QLabel(description.name)
         label.setMinimumWidth(150)
-        label.setToolTip(description.description)
-        layout.addWidget(label)
+        top_layout.addWidget(label)
         
         # Spinbox
         if is_float:
@@ -303,21 +404,65 @@ class ConfigControlFactory:
         if description.unit:
             spin.setSuffix(f" {description.unit}")
         
-        layout.addWidget(spin)
+        top_layout.addWidget(spin)
+        top_layout.addStretch()
         
-        # Add effect description as additional tooltip
-        effects = []
+        main_layout.addLayout(top_layout)
+        
+        # Build full-width description text
+        desc_lines = [description.description]
+        
         if description.effect_increase:
-            effects.append(f"↑ {description.effect_increase}")
+            desc_lines.append(f"↑ INCREASE: {description.effect_increase}")
         if description.effect_decrease:
-            effects.append(f"↓ {description.effect_decrease}")
-        if effects:
-            spin.setToolTip(description.description + "\n\n" + "\n".join(effects))
+            desc_lines.append(f"↓ DECREASE: {description.effect_decrease}")
+        
+        if description.min_val is not None and description.max_val is not None:
+            desc_lines.append(f" Range: {description.min_val} - {description.max_val} {description.unit}")
+        
+        desc_text = "\n".join(desc_lines)
+        
+        # Full-width description label with visual styling
+        desc_label = QLabel(desc_text)
+        desc_label.setWordWrap(True)
+        desc_label.setStyleSheet("""
+            QLabel {
+                color: #555555;
+                font-size: 13px;
+                padding: 8px 10px;
+                background-color: #f9f9f9;
+                border-left: 3px solid #2196f3;
+                border-radius: 4px;
+                margin-top: 4px;
+            }
+        """)
+        main_layout.addWidget(desc_label)
+        
+        # Update description when value changes (to show current value)
+        def update_description_with_value(current_value):
+            new_desc_lines = [description.description]
+            
+            if description.effect_increase:
+                new_desc_lines.append(f"↑ INCREASE: {description.effect_increase}")
+            if description.effect_decrease:
+                new_desc_lines.append(f"↓ DECREASE: {description.effect_decrease}")
+            
+            if description.min_val is not None and description.max_val is not None:
+                new_desc_lines.append(f" Range: {description.min_val} - {description.max_val} {description.unit}")
+            
+            new_desc_lines.append(f" Current value: {current_value} {description.unit}")
+            
+            desc_label.setText("\n".join(new_desc_lines))
+        
+        # Connect to update description when value changes
+        spin.valueChanged.connect(update_description_with_value)
+        
+        # Initial update
+        update_description_with_value(value)
         
         container = QWidget()
-        container.setLayout(layout)
+        container.setLayout(main_layout)
         return container
-
 
 class ProfileCard(QFrame):
     """Card-style widget for displaying profile information."""
@@ -713,22 +858,43 @@ class ConfigGUI(QMainWindow):
     def create_general_tab(self) -> QWidget:
         """Create the general settings tab."""
         widget = QWidget()
+        
+        # Create a scroll area to handle content that might be too tall
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        
+        content = QWidget()
         layout = QVBoxLayout()
+        layout.setSpacing(20)  # Consistent spacing between groups
+        layout.setContentsMargins(15, 15, 15, 15)  # Consistent margins
         
         # Camera selection
         camera_group = QGroupBox("Camera Settings")
+        camera_group.setStyleSheet("""
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                top: 0px;
+                padding: 0 5px 0 5px;
+            }
+        """)
         camera_layout = QGridLayout()
+        camera_layout.setSpacing(12)
+        camera_layout.setContentsMargins(10, 15, 10, 15)
         
         camera_layout.addWidget(QLabel("Camera ID:"), 0, 0)
         self.camera_spin = QSpinBox()
         self.camera_spin.setRange(0, 10)
         self.camera_spin.setValue(0)
+        self.camera_spin.setMinimumWidth(100)
         camera_layout.addWidget(self.camera_spin, 0, 1)
         
         camera_layout.addWidget(QLabel("Resolution:"), 1, 0)
         self.resolution_combo = QComboBox()
         self.resolution_combo.addItems(["640x480", "1280x720", "1920x1080"])
         self.resolution_combo.setCurrentText("640x480")
+        self.resolution_combo.setMinimumWidth(120)
         camera_layout.addWidget(self.resolution_combo, 1, 1)
         
         camera_group.setLayout(camera_layout)
@@ -736,27 +902,48 @@ class ConfigGUI(QMainWindow):
         
         # Calibration settings
         cal_group = QGroupBox("Calibration")
+        cal_group.setStyleSheet("""
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                top: 0px;
+                padding: 0 5px 0 5px;
+            }
+        """)
         cal_layout = QGridLayout()
-        
+        cal_layout.setSpacing(8)
+        cal_layout.setContentsMargins(10, 15, 10, 15)
+
         cal_layout.addWidget(QLabel("Samples:"), 0, 0)
         self.cal_samples_spin = QSpinBox()
         self.cal_samples_spin.setRange(10, 100)
         cal_samples = self.config.get("calibration", {}).get("samples", 30)
         self.cal_samples_spin.setValue(cal_samples)
+        self.cal_samples_spin.setMinimumWidth(100)
         cal_layout.addWidget(self.cal_samples_spin, 0, 1)
-        
+
         cal_layout.addWidget(QLabel("Auto-save:"), 1, 0)
         self.cal_autosave_check = QCheckBox()
         cal_autosave = self.config.get("calibration", {}).get("autosave", True)
         self.cal_autosave_check.setChecked(cal_autosave)
         cal_layout.addWidget(self.cal_autosave_check, 1, 1)
-        
+
         cal_group.setLayout(cal_layout)
         layout.addWidget(cal_group)
         
         # Display settings
         display_group = QGroupBox("Display Options")
+        display_group.setStyleSheet("""          
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                top: 0px;
+                padding: 0 5px 0 5px;
+            }
+        """)
         display_layout = QVBoxLayout()
+        display_layout.setSpacing(10)
+        display_layout.setContentsMargins(10, 15, 10, 15)
         
         self.show_landmarks_check = QCheckBox("Show facial landmarks")
         show_landmarks = self.config.get("display", {}).get("show_landmarks", True)
@@ -778,20 +965,56 @@ class ConfigGUI(QMainWindow):
         
         # Hotkey display
         hotkey_group = QGroupBox("Hotkeys (OpenCV window must be focused)")
+        hotkey_group.setStyleSheet("""
+             QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                top: 0px;
+                padding: 0 5px 0 5px;
+            }
+        """)
         hotkey_layout = QGridLayout()
+        hotkey_layout.setSpacing(10)
+        hotkey_layout.setVerticalSpacing(8)
+        hotkey_layout.setContentsMargins(10, 15, 10, 15)
         
         hotkeys = self.config.get("hotkeys", {})
         row = 0
         for key, value in hotkeys.items():
-            hotkey_layout.addWidget(QLabel(f"{key.replace('_', ' ').title()}:"), row, 0)
-            hotkey_layout.addWidget(QLabel(f"'{value}'"), row, 1)
+            key_text = key.replace('_', ' ').title()
+            key_label = QLabel(f"{key_text}:")
+            key_label.setMinimumWidth(120)
+            hotkey_layout.addWidget(key_label, row, 0)
+            
+            value_label = QLabel(f"'{value}'")
+            value_label.setStyleSheet("""
+                QLabel {
+                    font-family: monospace;
+                    font-weight: bold;
+                    color: #2196f3;
+                    background-color: #f5f5f5;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                }
+            """)
+            hotkey_layout.addWidget(value_label, row, 1)
             row += 1
         
         hotkey_group.setLayout(hotkey_layout)
         layout.addWidget(hotkey_group)
         
+        # Add stretch at the end to push everything up
         layout.addStretch()
-        widget.setLayout(layout)
+        
+        content.setLayout(layout)
+        scroll.setWidget(content)
+        
+        # Create main layout for the tab
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(scroll)
+        widget.setLayout(main_layout)
+        
         return widget
     
     def create_tracking_tab(self) -> QWidget:
@@ -838,6 +1061,14 @@ class ConfigGUI(QMainWindow):
         
         # Mode selection
         mode_group = QGroupBox("Control Mode")
+        mode_group.setStyleSheet("""
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                top: 0px;
+                padding: 0 5px 0 5px;
+            }
+        """)
         mode_layout = QVBoxLayout()
         
         self.absolute_radio = QCheckBox("Absolute Mode")
@@ -1052,6 +1283,14 @@ class ConfigGUI(QMainWindow):
         
         # Tips section
         tips_group = QGroupBox("Quick Tips")
+        tips_group.setStyleSheet("""
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                top: 0px;
+                padding: 0 5px 0 5px;
+            }
+        """)
         tips_layout = QVBoxLayout()
         
         tips = [
