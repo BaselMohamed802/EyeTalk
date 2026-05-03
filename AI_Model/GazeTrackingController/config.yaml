@@ -1,0 +1,35 @@
+camera:
+  id: 0
+  width: 640
+  height: 480
+
+gaze:
+  backend: roboflow_l2cs
+
+  roboflow:
+    host: "127.0.0.1"
+    port: 9001
+    endpoint: "/gaze/gaze_detection"
+    timeout_s: 0.35
+    jpeg_quality: 70
+
+  inference_hz: 15
+
+  confidence_gate: 0.50
+
+  calibration:
+    file: "GazeTrackingController/gaze_calibration.json"
+    points: 9
+    samples_per_point: 12
+
+  smoothing:
+    filter: kalman          # kalman | ema
+    ema_alpha: 0.55
+    kalman:
+      dt: 1.0
+      process_noise: 0.003
+      measurement_noise: 0.10
+
+  control:
+    deadzone_px: 3.0
+    movement_threshold_px: 0.8
