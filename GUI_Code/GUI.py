@@ -35,7 +35,7 @@ stack.addWidget(arabic_widget)   # Index 1
 english_widget.Language_Change_req.connect(switch_to_arabic)
 arabic_widget.Language_Change_req.connect(switch_to_english)
 
-stack.setFixedSize(1024, 768)
+stack.showFullScreen()
 stack.show()
 
 app.exec()
