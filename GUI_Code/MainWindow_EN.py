@@ -35,7 +35,7 @@ class Widget_EN(QWidget):
         self.tts = TTS()
 
         #Creating a Label to hold Thebes's Logo 
-        Thebes_Logo = QPixmap(r"M:\University\Level 4\Shit_Project\EyeTalk\Eye_Talk_Logo.png")
+        Thebes_Logo = QPixmap(r"M:\University\Level 4\Shit_Project\EyeTalk\Documentation\Eye_Talk_Logo.png")
         Thebes_Label = QLabel(self)
 
         Scaled = Thebes_Logo.scaled(400, 200,Qt.KeepAspectRatio, Qt.SmoothTransformation)
