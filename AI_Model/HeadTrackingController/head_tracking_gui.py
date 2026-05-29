@@ -6,6 +6,7 @@ Date: 2/2/2026
 Description:
     PySide6 GUI configuration interface for Head Tracking Mouse Control System.
     Allows users to tune all parameters before starting the tracking session.
+    Now fully resizable and dynamic – works on small displays (e.g., 1024x600).
 """
 
 import sys
@@ -666,7 +667,7 @@ class ConfigSectionWidget(QWidget):
 
 
 class ConfigGUI(QMainWindow):
-    """Main configuration window for Head Tracking System."""
+    """Main configuration window for Head Tracking System (fully resizable)."""
     
     def __init__(self):
         super().__init__()
@@ -676,7 +677,9 @@ class ConfigGUI(QMainWindow):
         self.modified = False
         
         self.setWindowTitle("Head Tracking Mouse Control - Configuration")
-        self.setMinimumSize(1000, 700)
+        # Allow window to be resized freely – no forced minimum size
+        self.setMinimumSize(800, 500)   # Small enough for 1024x600, but still usable
+        self.resize(1024, 700)          # Default size, but user can shrink
         
         # Set application style
         self.setStyleSheet("""
@@ -766,6 +769,7 @@ class ConfigGUI(QMainWindow):
         title.setFont(title_font)
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("color: #1976d2; margin: 10px;")
+        title.setWordWrap(True)  # Allow wrapping on small screens
         main_layout.addWidget(title)
         
         # Description
@@ -780,6 +784,9 @@ class ConfigGUI(QMainWindow):
         
         # Create splitter for main content and info panel
         splitter = QSplitter(Qt.Horizontal)
+        # Set stretch factors: left gets 65%, right 35% of available width
+        splitter.setStretchFactor(0, 65)
+        splitter.setStretchFactor(1, 35)
         
         # Left side - Tabbed configuration
         left_widget = QWidget()
@@ -796,12 +803,11 @@ class ConfigGUI(QMainWindow):
         left_layout.addWidget(self.tab_widget)
         left_widget.setLayout(left_layout)
         
-        # Right side - Info panel
+        # Right side - Info panel (with its own scroll area)
         right_widget = self.create_info_panel()
         
         splitter.addWidget(left_widget)
         splitter.addWidget(right_widget)
-        splitter.setSizes([700, 300])
         
         main_layout.addWidget(splitter)
         
@@ -1370,7 +1376,7 @@ class ConfigGUI(QMainWindow):
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
         
-        # Info text area
+        # Info text area (scrollable)
         self.info_text = QTextEdit()
         self.info_text.setReadOnly(True)
         self.info_text.setStyleSheet("""
