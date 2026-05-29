@@ -31,6 +31,7 @@ from collections import deque
 import cv2
 import numpy as np
 import yaml
+import pyautogui
 
 # -----------------------------
 # Module Imports
@@ -54,6 +55,21 @@ except Exception:
     from head_tracking import HeadTracker
     from mouse_controller import MouseController
     from filterManager import FilterManager
+
+# Blink detector
+try:
+    from blink_detector import BlinkDetector
+except ImportError:
+    # Fallback if file is not in the same directory
+    sys.path.insert(0, THIS_DIR)
+    from blink_detector import BlinkDetector
+
+# Dwell detector
+try:
+    from dwell_detector import DwellDetector
+except ImportError:
+    sys.path.insert(0, THIS_DIR)
+    from dwell_detector import DwellDetector
 
 
 # -----------------------------
@@ -142,6 +158,19 @@ def load_config(path: str = "config.yaml") -> dict:
         "calibration": {"file": "head_calibration.json", "autosave": True, "samples": 30},
         "mouse": {"update_interval": 0.01},
         "display": {"show_landmarks": True, "show_cube": True, "show_gaze_ray": True},
+        "clicking": {
+            "method": "disabled",
+            "blink": {
+                "ear_threshold": 0.22,
+                "consec_frames": 2,
+                "cooldown_sec": 1.0,
+                "use_both_eyes": False,
+            },
+            "dwell": {
+                "dwell_time_sec": 2.0,
+                "tolerance_px": 30.0,
+            }
+        }
     }
 
     # Resolve config path robustly if given a bare filename
@@ -531,6 +560,30 @@ def main():
     if not os.path.isabs(CAL_FILE):
         CAL_FILE = os.path.join(THIS_DIR, CAL_FILE)
 
+    # Clicking configuration
+    click_cfg = cfg.get("clicking", {})
+    click_method = click_cfg.get("method", "disabled")
+    blink_params = click_cfg.get("blink", {})
+    dwell_params = click_cfg.get("dwell", {})
+    blink_detector = None
+    dwell_detector = None
+    if click_method == "blink":
+        blink_detector = BlinkDetector(
+            ear_threshold=blink_params.get("ear_threshold", 0.22),
+            consec_frames=blink_params.get("consec_frames", 2),
+            cooldown_sec=blink_params.get("cooldown_sec", 1.0),
+            use_both_eyes=blink_params.get("use_both_eyes", False)
+        )
+        print("[Clicking] Eye blink click enabled")
+    elif click_method == "dwell":
+        dwell_detector = DwellDetector(
+            dwell_time_sec=dwell_params.get("dwell_time_sec", 2.0),
+            tolerance_px=dwell_params.get("tolerance_px", 30.0)
+        )
+        print("[Clicking] Dwell click enabled")
+    else:
+        print("[Clicking] Click method: disabled (manual click)")
+
     # Starting profile
     active_profile = str((cfg.get("profiles", {}) or {}).get("active", "BALANCED")).upper()
     if active_profile not in PROFILE_ORDER:
@@ -667,6 +720,19 @@ def main():
             if landmarks_list_3d:
                 landmarks_dict = {idx: (x, y, z) for idx, x, y, z in landmarks_list_3d}
 
+                # ----- Blink click detection -----
+                if blink_detector is not None:
+                    # Get raw normalised landmarks from face_detector (requires small mod in face_utils.py)
+                    raw_landmarks = getattr(face_detector, 'last_raw_landmarks', None)
+                    if raw_landmarks is not None:
+                        clicked = blink_detector.process(raw_landmarks.landmark, cam_width, cam_height)
+                        if clicked:
+                            pyautogui.click()
+                            # Visual feedback
+                            cv2.putText(frame, "BLINK CLICK!", (cam_width//2 - 70, cam_height//2),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+                # ---------------------------------
+
                 if SHOW_LANDMARKS:
                     for idx, x, y, z in landmarks_list_3d:
                         color = (155, 155, 155) if idx in FACE_OUTLINE_INDICES else (255, 25, 10)
@@ -707,6 +773,15 @@ def main():
                     if mouse_control_enabled and should_send:
                         with mouse_lock:
                             mouse_controller.set_target(screen_x, screen_y)
+
+                    # ----- Dwell click detection (uses screen_x, screen_y) -----
+                    if dwell_detector is not None and screen_x is not None and screen_y is not None:
+                        clicked = dwell_detector.process(screen_x, screen_y)
+                        if clicked:
+                            pyautogui.click()
+                            cv2.putText(frame, "DWELL CLICK!", (cam_width//2 - 70, cam_height//2),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+                    # ------------------------------------------------------------
 
                     # Visualization: cube
                     if SHOW_CUBE:

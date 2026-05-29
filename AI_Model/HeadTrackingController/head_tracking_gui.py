@@ -931,9 +931,126 @@ class ConfigGUI(QMainWindow):
         cal_group.setLayout(cal_layout)
         layout.addWidget(cal_group)
         
+        # ----- Clicking Options -------------------------------------------------
+        click_group = QGroupBox("Clicking Options")
+        click_group.setStyleSheet("""
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                top: 0px;
+                padding: 0 5px 0 5px;
+            }
+        """)
+        click_layout = QVBoxLayout()
+        click_layout.setSpacing(10)
+        click_layout.setContentsMargins(10, 15, 10, 15)
+
+        # Method selection
+        method_layout = QHBoxLayout()
+        method_layout.addWidget(QLabel("Click method:"))
+        self.click_method_combo = QComboBox()
+        self.click_method_combo.addItem("Disabled (manual click)", "disabled")
+        self.click_method_combo.addItem("Eye Blink", "blink")
+        self.click_method_combo.addItem("Dwell Click", "dwell")   # NEW
+        click_method = self.config.get("clicking", {}).get("method", "disabled")
+        idx = self.click_method_combo.findData(click_method)
+        if idx >= 0:
+            self.click_method_combo.setCurrentIndex(idx)
+        self.click_method_combo.currentIndexChanged.connect(self.on_click_method_changed)
+        method_layout.addWidget(self.click_method_combo)
+        method_layout.addStretch()
+        click_layout.addLayout(method_layout)
+
+        # Blink parameters container (shown only when blink is selected)
+        self.blink_params_widget = QWidget()
+        blink_params_layout = QGridLayout()
+        blink_params_layout.setSpacing(8)
+
+        blink_cfg = self.config.get("clicking", {}).get("blink", {})
+
+        self.ear_threshold_spin = QDoubleSpinBox()
+        self.ear_threshold_spin.setRange(0.10, 0.35)
+        self.ear_threshold_spin.setSingleStep(0.01)
+        self.ear_threshold_spin.setDecimals(3)
+        self.ear_threshold_spin.setValue(blink_cfg.get("ear_threshold", 0.22))
+        self.ear_threshold_spin.setToolTip("EAR value below which eye is considered closed. Lower = harder blink needed.")
+        self.ear_threshold_spin.valueChanged.connect(
+            lambda v: self.update_clicking_blink_param("ear_threshold", v))
+        blink_params_layout.addWidget(QLabel("EAR threshold:"), 0, 0)
+        blink_params_layout.addWidget(self.ear_threshold_spin, 0, 1)
+
+        self.consec_frames_spin = QSpinBox()
+        self.consec_frames_spin.setRange(1, 6)
+        self.consec_frames_spin.setValue(blink_cfg.get("consec_frames", 2))
+        self.consec_frames_spin.setToolTip("How many consecutive closed-eye frames confirm a blink.")
+        self.consec_frames_spin.valueChanged.connect(
+            lambda v: self.update_clicking_blink_param("consec_frames", v))
+        blink_params_layout.addWidget(QLabel("Consecutive frames:"), 1, 0)
+        blink_params_layout.addWidget(self.consec_frames_spin, 1, 1)
+
+        self.cooldown_spin = QDoubleSpinBox()
+        self.cooldown_spin.setRange(0.3, 2.5)
+        self.cooldown_spin.setSingleStep(0.1)
+        self.cooldown_spin.setDecimals(2)
+        self.cooldown_spin.setValue(blink_cfg.get("cooldown_sec", 1.0))
+        self.cooldown_spin.setToolTip("Minimum seconds between two click actions.")
+        self.cooldown_spin.valueChanged.connect(
+            lambda v: self.update_clicking_blink_param("cooldown_sec", v))
+        blink_params_layout.addWidget(QLabel("Cooldown (sec):"), 2, 0)
+        blink_params_layout.addWidget(self.cooldown_spin, 2, 1)
+
+        self.both_eyes_check = QCheckBox("Require both eyes to blink")
+        self.both_eyes_check.setChecked(blink_cfg.get("use_both_eyes", False))
+        self.both_eyes_check.setToolTip("If checked, both eyes must blink simultaneously to trigger a click.")
+        self.both_eyes_check.stateChanged.connect(
+            lambda state: self.update_clicking_blink_param("use_both_eyes", bool(state)))
+        blink_params_layout.addWidget(self.both_eyes_check, 3, 0, 1, 2)
+
+        self.blink_params_widget.setLayout(blink_params_layout)
+        click_layout.addWidget(self.blink_params_widget)
+
+        # Dwell parameters container (shown only when dwell is selected)
+        self.dwell_params_widget = QWidget()
+        dwell_params_layout = QGridLayout()
+        dwell_params_layout.setSpacing(8)
+
+        dwell_cfg = self.config.get("clicking", {}).get("dwell", {})
+
+        self.dwell_time_spin = QDoubleSpinBox()
+        self.dwell_time_spin.setRange(0.5, 5.0)
+        self.dwell_time_spin.setSingleStep(0.1)
+        self.dwell_time_spin.setDecimals(1)
+        self.dwell_time_spin.setValue(dwell_cfg.get("dwell_time_sec", 2.0))
+        self.dwell_time_spin.setToolTip("Seconds the cursor must stay still to trigger a click.")
+        self.dwell_time_spin.valueChanged.connect(
+            lambda v: self.update_clicking_dwell_param("dwell_time_sec", v))
+        dwell_params_layout.addWidget(QLabel("Dwell time (sec):"), 0, 0)
+        dwell_params_layout.addWidget(self.dwell_time_spin, 0, 1)
+
+        self.tolerance_spin = QDoubleSpinBox()
+        self.tolerance_spin.setRange(5.0, 100.0)
+        self.tolerance_spin.setSingleStep(5.0)
+        self.tolerance_spin.setDecimals(1)
+        self.tolerance_spin.setValue(dwell_cfg.get("tolerance_px", 30.0))
+        self.tolerance_spin.setToolTip("Maximum pixel movement allowed while counting as 'still'.")
+        self.tolerance_spin.valueChanged.connect(
+            lambda v: self.update_clicking_dwell_param("tolerance_px", v))
+        dwell_params_layout.addWidget(QLabel("Tolerance (px):"), 1, 0)
+        dwell_params_layout.addWidget(self.tolerance_spin, 1, 1)
+
+        self.dwell_params_widget.setLayout(dwell_params_layout)
+        click_layout.addWidget(self.dwell_params_widget)
+
+        # Initially show/hide the correct params widget based on current selection
+        self.on_click_method_changed()
+
+        click_group.setLayout(click_layout)
+        layout.addWidget(click_group)
+        # -----------------------------------------------------------------------
+        
         # Display settings
         display_group = QGroupBox("Display Options")
-        display_group.setStyleSheet("""          
+        display_group.setStyleSheet("""
             QGroupBox::title {
                 subcontrol-origin: margin;
                 left: 10px;
@@ -966,7 +1083,7 @@ class ConfigGUI(QMainWindow):
         # Hotkey display
         hotkey_group = QGroupBox("Hotkeys (OpenCV window must be focused)")
         hotkey_group.setStyleSheet("""
-             QGroupBox::title {
+            QGroupBox::title {
                 subcontrol-origin: margin;
                 left: 10px;
                 top: 0px;
@@ -1387,6 +1504,37 @@ class ConfigGUI(QMainWindow):
             self.config["control"] = {}
         self.config["control"]["default_mode"] = mode
         self.modified = True
+
+    # ----- Clicking config methods -----
+    def on_click_method_changed(self):
+        """Show/hide the appropriate parameters widget."""
+        method = self.click_method_combo.currentData()
+        self.blink_params_widget.setVisible(method == "blink")
+        self.dwell_params_widget.setVisible(method == "dwell")
+        self.update_clicking_method(method)
+
+    def update_clicking_method(self, method: str):
+        if "clicking" not in self.config:
+            self.config["clicking"] = {}
+        self.config["clicking"]["method"] = method
+        self.modified = True
+
+    def update_clicking_blink_param(self, param: str, value):
+        if "clicking" not in self.config:
+            self.config["clicking"] = {}
+        if "blink" not in self.config["clicking"]:
+            self.config["clicking"]["blink"] = {}
+        self.config["clicking"]["blink"][param] = value
+        self.modified = True
+
+    def update_clicking_dwell_param(self, param: str, value):
+        if "clicking" not in self.config:
+            self.config["clicking"] = {}
+        if "dwell" not in self.config["clicking"]:
+            self.config["clicking"]["dwell"] = {}
+        self.config["clicking"]["dwell"][param] = value
+        self.modified = True
+    # -----------------------------------
     
     def load_config(self) -> dict:
         """Load configuration from config.yaml."""
@@ -1453,6 +1601,19 @@ class ConfigGUI(QMainWindow):
                 "cycle_profile": "p",
                 "toggle_mode": "m",
                 "quit": "q"
+            },
+            "clicking": {
+                "method": "disabled",
+                "blink": {
+                    "ear_threshold": 0.22,
+                    "consec_frames": 2,
+                    "cooldown_sec": 1.0,
+                    "use_both_eyes": False,
+                },
+                "dwell": {
+                    "dwell_time_sec": 2.0,
+                    "tolerance_px": 30.0,
+                }
             }
         }
     
@@ -1474,6 +1635,21 @@ class ConfigGUI(QMainWindow):
             if "smoothing" not in self.config:
                 self.config["smoothing"] = {}
             self.config["smoothing"]["process_interval"] = self.process_interval_spin.value()
+
+            # Clicking settings
+            if "clicking" not in self.config:
+                self.config["clicking"] = {}
+            self.config["clicking"]["method"] = self.click_method_combo.currentData()
+            self.config["clicking"]["blink"] = {
+                "ear_threshold": self.ear_threshold_spin.value(),
+                "consec_frames": self.consec_frames_spin.value(),
+                "cooldown_sec": self.cooldown_spin.value(),
+                "use_both_eyes": self.both_eyes_check.isChecked(),
+            }
+            self.config["clicking"]["dwell"] = {
+                "dwell_time_sec": self.dwell_time_spin.value(),
+                "tolerance_px": self.tolerance_spin.value(),
+            }
             
             with open(filepath, 'w', encoding='utf-8') as f:
                 yaml.dump(self.config, f, default_flow_style=False, indent=2)
@@ -1597,52 +1773,6 @@ class ConfigGUI(QMainWindow):
                 self.show()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to start tracking: {e}")
-            self.show()
-
-    def _fix_protobuf_issues(self):
-        """Attempt to fix protobuf compatibility issues."""
-        try:
-            import sys
-            import subprocess
-            
-            # Check if we have the problematic protobuf version
-            try:
-                import google.protobuf
-                version = google.protobuf.__version__
-                print(f"Current protobuf version: {version}")
-                
-                # If version is too new, warn user
-                if version >= "4.0.0":
-                    print("Warning: Newer protobuf version may cause issues with MediaPipe")
-            except:
-                pass
-                
-        except Exception as e:
-            print(f"Protobuf fix attempt failed: {e}")
-
-    def _run_tracking_direct(self):
-        """Fallback method to run tracking directly."""
-        try:
-            # Set environment variables to help with compatibility
-            import os
-            os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
-            
-            # Add the script directory to path
-            script_dir = os.path.dirname(__file__)
-            if script_dir not in sys.path:
-                sys.path.insert(0, script_dir)
-            
-            # Try to import and run
-            from AI_Model.HeadTrackingController.head_tracking_control_backup import main
-            main()
-        except ImportError as e:
-            QMessageBox.critical(self, "Import Error", 
-                f"Could not import head_tracking_control module: {e}\n\n"
-                f"Make sure the file is in: {os.path.dirname(__file__)}")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to start tracking: {e}")
-        finally:
-            # Show GUI again when tracking ends
             self.show()
 
 
