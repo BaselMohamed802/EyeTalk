@@ -151,6 +151,9 @@ class FaceMeshDetector:
         # Iris Landmark indices (ONLY available when refine_landmarks=True)
         self.LEFT_IRIS_IDS = [474, 475, 476, 477]
         self.RIGHT_IRIS_IDS = [469, 470, 471, 472]
+        
+        # Storage for raw landmarks (for blink detection, etc.)
+        self.last_raw_landmarks = None
 
     def draw_face_mesh(self, img, draw_face=True, draw_iris=False, 
                        draw_tesselation=True, draw_contours=False):
@@ -467,6 +470,9 @@ class FaceMeshDetector:
         """
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.face_mesh.process(img_rgb)
+        
+        # Store raw landmarks for external use (e.g., blink detection)
+        self.last_raw_landmarks = self.results.multi_face_landmarks[0] if self.results.multi_face_landmarks else None
         
         landmarks_frame = np.zeros_like(img)  # Black frame
         landmarks_list_3d = []  # List of (idx, x, y, z)

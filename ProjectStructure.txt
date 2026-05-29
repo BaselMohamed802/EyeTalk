@@ -1,0 +1,332 @@
+Folder PATH listing for volume Work SD
+Volume serial number is 000000F2 F0AF:0600
+G:.
+|   .gitattributes
+|   .gitignore
+|   LICENSE
+|   ProjectStructure.txt
+|   README.md
+|   requirements.txt
+|   
++---.vscode
+|       settings.json
+|       
++---AI_Model
+|   |   mouse_circle.py
+|   |   mouse_circle_lite.py
+|   |   structure.txt
+|   |   
+|   +---Calibration
+|   |   \---__pycache__
+|   |           calibration.cpython-312.pyc
+|   |           calibration_logic.cpython-312.pyc
+|   |           calibration_model.cpython-312.pyc
+|   |           calibration_sampler.cpython-312.pyc
+|   |           calibration_ui.cpython-312.pyc
+|   |           
+|   +---ClickingMethods
+|   |       eye_blink_click.py
+|   |       
+|   +---EyeJoystickController
+|   +---Filters
+|   |   |   EMAFilter.py
+|   |   |   filterManager.py
+|   |   |   kalmanFilter.py
+|   |   |   README.md
+|   |   |   __init__.py
+|   |   |   
+|   |   \---__pycache__
+|   |           EMAFilter.cpython-312.pyc
+|   |           filterManager.cpython-312.pyc
+|   |           kalmanFilter.cpython-312.pyc
+|   |           __init__.cpython-312.pyc
+|   |           
+|   +---HeadTrackingController
+|   |   |   config.yaml
+|   |   |   head_calibration.json
+|   |   |   head_tracking_control.py
+|   |   |   head_tracking_control_backup.py
+|   |   |   head_tracking_gui.py
+|   |   |   How to Launch.txt
+|   |   |   
+|   |   \---__pycache__
+|   |           head_tracking_control.cpython-312.pyc
+|   |           
+|   +---PyautoguiController
+|   |   |   mouse_controller.py
+|   |   |   pyautogui_controller.py
+|   |   |   README.md
+|   |   |   
+|   |   \---__pycache__
+|   |           gaze_runtime_controller.cpython-312.pyc
+|   |           mouse_controller.cpython-312.pyc
+|   |           smoothing.cpython-312.pyc
+|   |           
+|   +---VisionModule
+|   |   |   camera.py
+|   |   |   face_utils.py
+|   |   |   head_tracking.py
+|   |   |   README.md
+|   |   |   
+|   |   \---__pycache__
+|   |           camera.cpython-312.pyc
+|   |           camera.cpython-313.pyc
+|   |           face_utils.cpython-312.pyc
+|   |           face_utils.cpython-313.pyc
+|   |           head_tracking.cpython-312.pyc
+|   |           
+|   \---__pycache__
+|           calibration_integrated.cpython-312.pyc
+|           gaze_vector_mapper.cpython-312.pyc
+|           head_tracking_helper.cpython-312.pyc
+|           relative_gaze_mapper.cpython-312.pyc
+|           
++---Documentation
+|   |   CFP2026.pdf
+|   |   CFProject2026.pdf
+|   |   EyeTalk Logo (Black).png
+|   |   EyeTalk Logo (White).jpeg
+|   |   EyeTalk Project Abstract.docx
+|   |   EyeTalk Project Abstract.pdf
+|   |   EyeTalk Proposal.pdf
+|   |   EyeTalk Video Script.docx
+|   |   Project Presentation 2-14-2026 (1).pptx
+|   |   Proposal Template.docx
+|   |   proposal_template.docx
+|   |   proposal_template.pdf
+|   |   Video Script.txt
+|   |   Working on Project.jpeg
+|   |   
+|   \---Images - Videos
+|       \---Working-code
+|               Added Main function for Keyboard.png
+|               Eyetalk Graduation Project Milestone 1- Compressed.mp4
+|               EyeTalk Graduation Project Milestone 1.mp4
+|               Eyetalk Project Proposal Video.mp4
+|               Final_GUI_AR.png
+|               Final_GUI_AR_Light.png
+|               Final_GUI_EN.png
+|               Final_GUI_EN_Light.png
+|               Final_GUI_Product.mp4
+|               GUI_Keboard_Testing.png
+|               GUI_Keyboard_AR.png
+|               GUI_Keyboard_EN.png
+|               GUI_Test_AR&EN.mp4
+|               Head-Track Test 1.png
+|               Head-Track Test 2.png
+|               Iris Tracking Final Test 12-7-2025.mp4
+|               testing camera - iris detection.png
+|               Video Intro.mp4
+|               Video MID.mp4
+|               Video Outro.mp4
+|               
++---GUI_Code
+|   |   GUI.py
+|   |   MainWindow_AR.py
+|   |   MainWindow_EN.py
+|   |   README.md
+|   |   TTS_Engine.py
+|   |   
+|   \---__pycache__
+|           MainWindow.cpython-312.pyc
+|           MainWindow_AR.cpython-312.pyc
+|           MainWindow_EN.cpython-312.pyc
+|           TTS_Engine.cpython-312.pyc
+|           TTS_Engine.cpython-313.pyc
+|           
++---RPI 3D Case Design
+|   |   LCD Dimensions (Thickness).jpg
+|   |   LCD Dimensions (W, H).jpg
+|   |   Main Case Body Design.stl
+|   |   Raspberry Pi System Case Design.f3z
+|   |   Raspberry Pi System Case Design.step
+|   |   
+|   +---Case V2 - MostlyBuilds
+|   |   |   LICENSE.txt
+|   |   |   README.txt
+|   |   |   
+|   |   +---Altered Case
+|   |   |   |   Altered Backplate.step
+|   |   |   |   Altered Case - Full Body.f3z
+|   |   |   |   Altered Case - Full Body.step
+|   |   |   |   Altered Case Feet Angled.stl
+|   |   |   |   Altered Feet Angled.step
+|   |   |   |   Altered Feet.step
+|   |   |   |   Altered Main Body.step
+|   |   |   |   Backplate.stl
+|   |   |   |   Feet.stl
+|   |   |   |   Main Body.stl
+|   |   |   |   Power bank - Bottom.stl
+|   |   |   |   Power bank - TOP.stl
+|   |   |   |   Power Bank.step
+|   |   |   |   Power Bank_.f3z
+|   |   |   |   
+|   |   |   +---Images
+|   |   |   |       a6f4f172-2185-4028-9109-10d112a4a7de.PNG
+|   |   |   |       ScreenCase_-_Full_Body_2026-Mar-02_06-52-44PM-000_CustomizedView31079553491.png
+|   |   |   |       ScreenCase_-_Full_Body_2026-Mar-02_06-53-08PM-000_CustomizedView17738832918.png
+|   |   |   |       ScreenCase_-_Full_Body_2026-Mar-02_06-57-04PM-000_CustomizedView7468862031.png
+|   |   |   |       
+|   |   |   \---New folder
+|   |   +---files
+|   |   |       BackCover.stl
+|   |   |       Foot.stl
+|   |   |       MainBody.stl
+|   |   |       ScreenCase - FIXED.scad
+|   |   |       ScreenCase.scad
+|   |   |       
+|   |   +---Fixed - NEW CASE
+|   |   |       ScreenCase - Backplate.step
+|   |   |       ScreenCase - Feet Angle.f3d
+|   |   |       ScreenCase - Feet Angle.step
+|   |   |       ScreenCase - Feet Original.step
+|   |   |       ScreenCase - Main Body + Speaker Shield.f3d
+|   |   |       ScreenCase - Main Body + Speaker Shield.step
+|   |   |       ScreenCase - Main Body.step
+|   |   |       ScreenCase - Main Body.stl
+|   |   |       ScreenCase - Speaker Shield.stl
+|   |   |       ScreenCase-Group002.f3d
+|   |   |       ScreenCase.csg
+|   |   |       ScreenRPI - Backplate.stl
+|   |   |       Tilted 25deg Feet.stl
+|   |   |       
+|   |   +---Fixed - Original Files
+|   |   |       ScreenCase - Back Plate.step
+|   |   |       ScreenCase - Feet.step
+|   |   |       ScreenCase - Fixed.csg
+|   |   |       ScreenCase - Main Body.step
+|   |   |       
+|   |   \---images
+|   |           36a7661c-349a-489b-8a09-a562c6fbce8f.jpg
+|   |           4857d36c-2df4-4b95-a912-c100ab667105.png
+|   |           631fce7b-15a3-4247-b1db-00e386b3803f.png
+|   |           bec1cbb0-cb2e-4118-b83e-0974e5ae0520.png
+|   |           d5dd9f47-1fdf-439b-bd61-b42e73810a61.png
+|   |           ec981cf4-8496-40fe-9265-4fc268163756.jpg
+|   |           
+|   +---Case V3 - Final Design
+|   |   |   Backplate - FINAL FINAL..stl
+|   |   |   Feet - FINAL FINAL..stl
+|   |   |   Main Body - FINAL FINAL..stl
+|   |   |   Mounted Battery Bottom - FINAL FINAL..stl
+|   |   |   Mounted Battery Top - FINAL FINAL..stl
+|   |   |   Raspberry Pi Case - FINAL FINAL..f3z
+|   |   |   ScreenCase - Full Body.step
+|   |   |   
+|   |   \---Images
+|   |           Image 1..png
+|   |           Image 2..png
+|   |           Image 3..png
+|   |           Image 4..png
+|   |           Image 5..png
+|   |           Image 6..png
+|   |           Image 7..png
+|   |           
+|   +---Components
+|   |       5.5 x 2.5mm DC Power Jack, Screw Terminals.step
+|   |       CREDIT - Design Owners.txt
+|   |       FAN Cover 60mm-220mm.SLDPRT
+|   |       GDSTIME 50mm x 50mm x 20mm 12V Brushless Cooling Fan.stp
+|   |       HDMI Port.STEP
+|   |       Hosyond 10.1 IPS Dispaly ASM.STEP
+|   |       KCD1-11-2P-Off.step
+|   |       li-ion-battery.igs
+|   |       Monitor Arm Assembly.STEP
+|   |       Mono_Enclosed_Speaker_3W-4Ohm.STEP
+|   |       PJ320D.STEP
+|   |       Power Switch Colored.STEP
+|   |       raspberry_pi_5.step
+|   |       Safe guard plate.stp
+|   |       XL4016.stp
+|   |       
+|   \---Final 3D Design Pictures
+|           EyeTalk System 3D Design (Only Screen - BACK View).png
+|           EyeTalk System 3D Design (Only Screen - FRONT View).png
+|           EyeTalk System 3D Design (Only Screen - Home View).png
+|           EyeTalk System 3D Design (Only Screen - INSIDE View).png
+|           EyeTalk System 3D Design (Only Screen - TOP View).png
+|           EyeTalk System 3D Design - Back.png
+|           EyeTalk System 3D Design - Front.PNG
+|           
+\---[OLD] - [OBSOLETE]
+    |   Project Structure 1-27-2026.txt
+    |   Project Structure 12-6-2025.txt
+    |   
+    +---Calibration
+    |   |   calibration_logic.py
+    |   |   calibration_model.py
+    |   |   calibration_sampler.py
+    |   |   calibration_ui.py
+    |   |   README.md
+    |   |   
+    |   \---test_codes
+    |           calibration_model_test.py
+    |           calibration_ui_test.py
+    |           
+    +---Docs
+    |       Eyetalk Presentation [11-29-2025].pptx
+    |       EyeTalk Roadmap.eddx
+    |       EyeTalk Roadmap.jpg
+    |       EyeTalk Roadmap.pdf
+    |       EyeTalk Roadmap.png
+    |       Learning route.docx
+    |       Main Hardware Components.txt
+    |       Project flowchart 10-29-2025.drawio
+    |       Project flowchart 10-29-2025.jpg
+    |       
+    +---Final Test Scripts
+    |       iris_tracking_comparison_example.py
+    |       iris_tracking_no_filters.py
+    |       test_camera.py
+    |       
+    \---Inverter Circuit
+        |   DIY Inverter Circuit - KiCAD-job.gbrjob
+        |   DIY Inverter Circuit - KiCAD.kicad_pcb
+        |   DIY Inverter Circuit - KiCAD.kicad_prl
+        |   DIY Inverter Circuit - KiCAD.kicad_pro
+        |   DIY Inverter Circuit - KiCAD.kicad_sch
+        |   DIY Inverter Components & Diagram.eddx
+        |   DIY Inverter Components & Diagram.png
+        |   fp-info-cache
+        |   
+        +---Datasheets
+        |       EGS002.PDF
+        |       LM340.PDF
+        |       
+        +---DIY Inverter Circuit - KiCAD-backups
+        |       DIY Inverter Circuit - KiCAD-2026-02-08_184952.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-08_191544.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-08_192737.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-09_121405.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-09_154907.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-10_235655.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-11_123023.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-12_180211.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-12_182659.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-12_185339.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-12_190815.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-12_193616.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-14_182520.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-14_183550.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-14_185217.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-14_185849.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-14_194711.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-15_200025.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-15_200729.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-15_223029.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-15_223921.zip
+        |       DIY Inverter Circuit - KiCAD-2026-02-15_224859.zip
+        |       
+        +---Inverter_PCB_V1
+        |       DIY Inverter Circuit - KiCAD.pdf
+        |       
+        +---Inverter_PCB_V1_F
+        |       DIY Inverter Circuit - KiCAD_F.pdf
+        |       
+        \---Reference Files
+                Invoice_505991.pdf
+                Pinout.png
+                Schematic Reference.png
+                Screenshot 2022-05-24 202901.png
+                Sine wave inverter PCB.pdf
+                

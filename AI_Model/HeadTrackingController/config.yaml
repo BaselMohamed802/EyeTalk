@@ -1,133 +1,113 @@
-tracking:
-  yaw_range: 20
-  pitch_range: 10
-  filter_length: 8
-
-  invert_x: true
-  invert_y: true
-
-  min_detection_confidence: 0.5
-  min_tracking_confidence: 0.5
-
-smoothing:
-  process_interval: 0.01
-
-# =======================================
-#          Control Type Section
-# =======================================
-
+calibration:
+  autosave: true
+  file: head_calibration.json
+  samples: 30
+clicking:
+  method: disabled               # disabled | blink | dwell
+  blink:
+    ear_threshold: 0.22
+    consec_frames: 2
+    cooldown_sec: 1.0
+    use_both_eyes: false
+  dwell:
+    dwell_time_sec: 2.0
+    tolerance_px: 30.0
 control:
-  default_mode: absolute         # absolute | relative
-  start_mouse_enabled: true
-
+  default_mode: absolute
   movement_threshold_px: 0.5
   pixel_deadzone_radius: 2.0
-
   relative:
-    max_speed_px_per_s: 1800.0
     deadzone_deg: 1.5
     expo: 1.6
-
-# =======================================
-#            HotKeys Section
-# =======================================
-
-hotkeys:
-  # NOTE: with OpenCV waitKey, the OpenCV window must be focused.
-  toggle_mouse: "7"     # was F7 on Windows; "7" is reliable on Linux/OpenCV
-  calibrate: "c"
-  cycle_profile: "p"
-  toggle_mode: "m"
-  quit: "q"
-
-# =======================================
-#            Filters Section
-# =======================================
-
+    max_speed_px_per_s: 1800.0
+  start_mouse_enabled: true
+display:
+  show_cube: true
+  show_gaze_ray: true
+  show_landmarks: true
 filter:
-  type: kalman                   # kalman | ema
-
   ema:
     alpha: 0.55
-
   kalman:
     dt: 1.0
-    process_noise: 0.002
     measurement_noise: 0.08
-
+    process_noise: 0.002
+  type: kalman
+hotkeys:
+  calibrate: c
+  cycle_profile: p
+  quit: q
+  toggle_mode: m
+  toggle_mouse: '7'
+mouse:
+  update_interval: 0.01
 profiles:
-  active: BALANCED               # FAST | BALANCED | SMOOTH
-
-  FAST:
-    tracking:
-      filter_length: 6
-      yaw_range: 18
-      pitch_range: 9
-    smoothing:
-      process_interval: 0.006
-    control:
-      movement_threshold_px: 0.3
-      pixel_deadzone_radius: 1.0
-      relative:
-        max_speed_px_per_s: 2200
-        deadzone_deg: 1.2
-        expo: 1.4
-    filter:
-      type: ema
-      ema:
-        alpha: 0.60
-
   BALANCED:
-    tracking:
-      filter_length: 8
-      yaw_range: 20
-      pitch_range: 10
-    smoothing:
-      process_interval: 0.010
     control:
       movement_threshold_px: 0.5
       pixel_deadzone_radius: 2.0
       relative:
-        max_speed_px_per_s: 1800
         deadzone_deg: 1.5
         expo: 1.6
+        max_speed_px_per_s: 1800
     filter:
-      type: kalman
       kalman:
         dt: 1.0
-        process_noise: 0.002
         measurement_noise: 0.08
-
-  SMOOTH:
-    tracking:
-      filter_length: 12
-      yaw_range: 24
-      pitch_range: 12
+        process_noise: 0.002
+      type: kalman
     smoothing:
-      process_interval: 0.014
+      process_interval: 0.01
+    tracking:
+      filter_length: 8
+      pitch_range: 10
+      yaw_range: 20
+  FAST:
+    control:
+      movement_threshold_px: 0.3
+      pixel_deadzone_radius: 1.0
+      relative:
+        deadzone_deg: 1.2
+        expo: 1.4
+        max_speed_px_per_s: 2200
+    filter:
+      ema:
+        alpha: 0.6
+      type: ema
+    smoothing:
+      process_interval: 0.006
+    tracking:
+      filter_length: 6
+      pitch_range: 9
+      yaw_range: 18
+  SMOOTH:
     control:
       movement_threshold_px: 0.8
       pixel_deadzone_radius: 2.5
       relative:
-        max_speed_px_per_s: 1500
         deadzone_deg: 1.8
         expo: 1.8
+        max_speed_px_per_s: 1500
     filter:
-      type: kalman
       kalman:
         dt: 1.0
-        process_noise: 0.0008
         measurement_noise: 0.12
-
-calibration:
-  file: head_calibration.json
-  autosave: true
-  samples: 30
-
-mouse:
-  update_interval: 0.01
-
-display:
-  show_landmarks: true
-  show_cube: true
-  show_gaze_ray: true
+        process_noise: 0.0008
+      type: kalman
+    smoothing:
+      process_interval: 0.014
+    tracking:
+      filter_length: 12
+      pitch_range: 12
+      yaw_range: 24
+  active: BALANCED
+smoothing:
+  process_interval: 0.01
+tracking:
+  filter_length: 8
+  invert_x: true
+  invert_y: true
+  min_detection_confidence: 0.5
+  min_tracking_confidence: 0.5
+  pitch_range: 10
+  yaw_range: 20
