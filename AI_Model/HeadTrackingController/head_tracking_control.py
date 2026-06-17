@@ -5,7 +5,8 @@ Date: 2/1/2026
 
 Description:
     Head Tracking Mouse Control System (Config-driven, FULL SCRIPT)
-    Features fully decoupled clicking integrations (Blink and Dwell).
+    Features fully decoupled clicking integrations (Blink and Dwell)
+    and robust uppercase/lowercase hotkey detection.
 """
 
 import os
@@ -74,15 +75,12 @@ def deep_merge(base: dict, override: dict) -> dict:
     return out
 
 def _find_config_path(filename: str = "config.yaml") -> str | None:
-    candidates = [
-        os.path.join(THIS_DIR, filename),
-        os.path.join(PROJECT_ROOT, filename),
-        os.path.join(os.getcwd(), filename),
-    ]
-    for p in candidates:
-        if os.path.exists(p):
-            return p
-    return None
+    # PATH FIX: Always prioritize the specific directory this script is in
+    p = os.path.join(THIS_DIR, filename)
+    if os.path.exists(p): return p
+    p = os.path.join(PROJECT_ROOT, filename)
+    if os.path.exists(p): return p
+    return os.path.join(os.getcwd(), filename)
 
 def load_config(path: str = "config.yaml") -> dict:
     defaults = {
@@ -442,10 +440,12 @@ def main():
     SHOW_CUBE = bool(cfg["display"].get("show_cube", True))
     SHOW_GAZE_RAY = bool(cfg["display"].get("show_gaze_ray", True))
 
+    # PATH FIX: Always force calibration file to save in the script's exact directory
     cal_cfg = cfg.get("calibration", {}) or {}
     CAL_FILE = str(cal_cfg.get("file", "head_calibration.json"))
     if not os.path.isabs(CAL_FILE):
-        CAL_FILE = os.path.join(THIS_DIR, CAL_FILE)
+        CAL_FILE = os.path.join(THIS_DIR, os.path.basename(CAL_FILE))
+        
     CAL_AUTOSAVE = bool(cal_cfg.get("autosave", True))
     CAL_SAMPLES = int(cal_cfg.get("samples", 30))
 
@@ -556,16 +556,18 @@ def main():
     KEY_MODE   = str(hk.get("toggle_mode", "m")).lower()
     KEY_QUIT   = str(hk.get("quit", "q")).lower()
 
+    # HOTKEY FIX: Checks both lower and upper case variations robustly
     def _key_match(k: int, key: str) -> bool:
-        if key in ("space", " "):
-            return k == 32
         if not key:
             return False
-        return k == ord(key[0])
+        if key in ("space", " "):
+            return k == 32
+        key_char = key[0].lower()
+        return k == ord(key_char) or k == ord(key_char.upper())
 
-    print("\nHotkeys (focus the OpenCV window):")
+    print("\nHotkeys (OpenCV window MUST be focused/clicked):")
     print(f"  {KEY_TOGGLE.upper()} : Toggle mouse control")
-    print(f"  {KEY_CALIB.upper()} : Calibrate")
+    print(f"  {KEY_CALIB.upper()} : Calibrate Center")
     print(f"  {KEY_PROF.upper()} : Cycle profiles")
     print(f"  {KEY_MODE.upper()} : Toggle mode")
     print(f"  {KEY_QUIT.upper()} : Quit\n")

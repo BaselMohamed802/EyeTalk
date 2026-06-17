@@ -6,7 +6,7 @@ Date: 2/2/2026
 Description:
     PySide6 GUI configuration interface for Head Tracking Mouse Control System.
     Fully responsive layout optimized for 1024x600 Raspberry Pi touchscreens.
-    Features dedicated UI groups for Control Modes and Clicking Methods.
+    Integrated Clicking Method selections and strict absolute pathing.
 """
 
 import sys
@@ -390,6 +390,10 @@ class ConfigGUI(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        
+        # --- PATHING FIX: Force GUI to target its exact directory ---
+        self.config_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
+        
         self.config = self.load_config()
         self.profiles = self.config.get("profiles", {})
         self.current_profile = self.profiles.get("active", "BALANCED") if self.profiles else "BALANCED"
@@ -628,7 +632,6 @@ class ConfigGUI(QMainWindow):
 
         # --- GENERAL CONTROL THRESHOLDS ---
         control_config = self.config.get("control", {})
-        # Filter out mode and click method since we built custom boxes for them
         flat_control = {k: v for k, v in control_config.items() 
                         if not isinstance(v, dict) and k not in ["default_mode", "clicking_method"]}
         
@@ -764,13 +767,13 @@ class ConfigGUI(QMainWindow):
         self.modified = True
     
     def load_config(self) -> dict:
-        for path in ["config.yaml", os.path.join(os.path.dirname(__file__), "config.yaml")]:
-            if os.path.exists(path):
-                try:
-                    with open(path, 'r', encoding='utf-8') as f:
-                        return yaml.safe_load(f) or {}
-                except:
-                    pass
+        # PATH FIX: Only look in the script's exact directory
+        if os.path.exists(self.config_file_path):
+            try:
+                with open(self.config_file_path, 'r', encoding='utf-8') as f:
+                    return yaml.safe_load(f) or {}
+            except Exception as e:
+                print(f"Error loading config: {e}")
         return self.get_default_config()
     
     def get_default_config(self) -> dict:
@@ -812,7 +815,7 @@ class ConfigGUI(QMainWindow):
             return False
     
     def save_config_dialog(self):
-        filepath, _ = QFileDialog.getSaveFileName(self, "Save Configuration", "config.yaml", "YAML files (*.yaml)")
+        filepath, _ = QFileDialog.getSaveFileName(self, "Save Configuration", self.config_file_path, "YAML files (*.yaml)")
         if filepath:
             self.save_config(filepath)
     
@@ -834,13 +837,14 @@ class ConfigGUI(QMainWindow):
             QMessageBox.information(self, "Success", "Settings reset. Restart window to see changes.")
     
     def start_tracking(self):
-        self.save_config("config.yaml")
+        # PATH FIX: Use absolute predefined path instead of relative string
+        self.save_config(self.config_file_path)
         self.statusBar().showMessage("Starting head tracking...")
         self.hide()
 
         try:
             import subprocess
-            main_script = os.path.join(os.path.dirname(__file__), "head_tracking_control.py")
+            main_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "head_tracking_control.py")
 
             if os.path.exists(main_script):
                 env = os.environ.copy()
