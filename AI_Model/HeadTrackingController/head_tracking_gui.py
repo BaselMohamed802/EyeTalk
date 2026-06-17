@@ -6,15 +6,14 @@ Date: 2/2/2026
 Description:
     PySide6 GUI configuration interface for Head Tracking Mouse Control System.
     Fully responsive layout optimized for 1024x600 Raspberry Pi touchscreens.
+    Features dedicated UI groups for Control Modes and Clicking Methods.
 """
 
 import sys
 import os
-import json
 import yaml
 from typing import Dict, Any, Optional
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
 
 # Fix for the Qt DPI warning on Windows/Linux
 os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "1"
@@ -23,13 +22,13 @@ os.environ["QT_SCALE_FACTOR"] = "1"
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QTabWidget, QGroupBox, QLabel, QSlider, QCheckBox, QComboBox,
+    QTabWidget, QGroupBox, QLabel, QCheckBox, QComboBox,
     QPushButton, QSpinBox, QDoubleSpinBox, QMessageBox, QFileDialog,
-    QScrollArea, QFrame, QSplitter, QTextEdit, QGridLayout, QStatusBar,
+    QScrollArea, QFrame, QSplitter, QTextEdit, QGridLayout,
     QButtonGroup, QSizePolicy
 )
-from PySide6.QtCore import Qt, QTimer, Signal, QThread
-from PySide6.QtGui import QFont, QPalette, QColor, QIcon
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
 
 
 @dataclass
@@ -41,8 +40,6 @@ class ConfigDescription:
     max_val: Optional[float] = None
     step: float = 1.0
     unit: str = ""
-    effect_increase: str = ""
-    effect_decrease: str = ""
 
 
 class ConfigDefinitions:
@@ -52,23 +49,17 @@ class ConfigDefinitions:
         "yaw_range": ConfigDescription(
             name="Yaw Range (degrees)",
             description="How far left/right you need to turn to reach screen edges",
-            min_val=5, max_val=45, step=1, unit="°",
-            effect_increase="Less head movement needed to reach edges",
-            effect_decrease="More head movement needed to reach edges"
+            min_val=5, max_val=45, step=1, unit="°"
         ),
         "pitch_range": ConfigDescription(
             name="Pitch Range (degrees)",
             description="How far up/down you need to tilt to reach screen edges",
-            min_val=5, max_val=30, step=1, unit="°",
-            effect_increase="Less head tilt needed",
-            effect_decrease="More head tilt needed"
+            min_val=5, max_val=30, step=1, unit="°"
         ),
         "filter_length": ConfigDescription(
             name="Position Buffer Size",
             description="Number of frames to average for smoothing head position",
-            min_val=1, max_val=20, step=1,
-            effect_increase="Smoother but more laggy movement",
-            effect_decrease="More responsive but potentially jittery"
+            min_val=1, max_val=20, step=1
         ),
         "invert_x": ConfigDescription(
             name="Invert Horizontal",
@@ -91,14 +82,6 @@ class ConfigDefinitions:
     }
     
     CONTROL_DESCRIPTIONS = {
-        "default_mode": ConfigDescription(
-            name="Control Mode",
-            description="Absolute: cursor at head position | Relative: head acts like joystick",
-        ),
-        "clicking_method": ConfigDescription(
-            name="Clicking Method",
-            description="Select how you want to perform mouse clicks",
-        ),
         "movement_threshold_px": ConfigDescription(
             name="Movement Threshold (px)",
             description="Minimum pixel movement required to update cursor",
@@ -176,7 +159,7 @@ class ConfigControlFactory:
         
         if param_type == "bool" or isinstance(value, bool):
             return ConfigControlFactory._create_checkbox(parent, param_name, value, description, callback)
-        elif param_type == "choice" or param_name in ["default_mode", "type", "clicking_method"]:
+        elif param_type == "choice" or param_name in ["type"]:
             return ConfigControlFactory._create_combobox(parent, param_name, value, description, callback)
         elif isinstance(value, (int, float)):
             if isinstance(value, int) and param_name not in ["max_speed_px_per_s"]:
@@ -223,12 +206,8 @@ class ConfigControlFactory:
         combo = QComboBox()
         combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         
-        if param_name == "default_mode":
-            choices = ["absolute", "relative"]
-        elif param_name == "type":
+        if param_name == "type":
             choices = ["kalman", "ema"]
-        elif param_name == "clicking_method":
-            choices = ["none", "blink", "dwell"]
         else:
             choices = [str(value)]
         
@@ -239,14 +218,14 @@ class ConfigControlFactory:
         if index >= 0:
             combo.setCurrentIndex(index)
         
-        combo.currentIndexChanged.connect(lambda: callback(param_name, combo.currentData()))
-        h_layout.addWidget(combo)
-        
-        main_layout.addLayout(h_layout)
-
         desc_label = QLabel(description.description)
         desc_label.setWordWrap(True)
         desc_label.setStyleSheet("color: #666666; font-size: 11px;")
+        
+        combo.currentIndexChanged.connect(lambda: callback(param_name, combo.currentData() or combo.currentText().lower()))
+        
+        h_layout.addWidget(combo)
+        main_layout.addLayout(h_layout)
         main_layout.addWidget(desc_label)
         
         return container
@@ -373,7 +352,7 @@ class ConfigSectionWidget(QWidget):
                 
                 if param_name in ["invert_x", "invert_y", "start_mouse_enabled"]:
                     param_type = "bool"
-                elif param_name in ["default_mode", "type", "clicking_method"]:
+                elif param_name in ["type"]:
                     param_type = "choice"
                 else:
                     param_type = "float" if isinstance(value, float) else "int"
@@ -417,7 +396,6 @@ class ConfigGUI(QMainWindow):
         self.modified = False
         
         self.setWindowTitle("Head Tracking Config")
-        # --- RESPONSIVE FIX: Safe minimum size for 1024x600 screens ---
         self.setMinimumSize(700, 400)
         
         self.setStyleSheet("""
@@ -466,7 +444,6 @@ class ConfigGUI(QMainWindow):
         
         splitter = QSplitter(Qt.Horizontal)
         
-        # Left Side (Tabs)
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
@@ -480,19 +457,15 @@ class ConfigGUI(QMainWindow):
         
         left_layout.addWidget(self.tab_widget)
         
-        # Right Side (Info Panel)
         right_widget = self.create_info_panel()
         
         splitter.addWidget(left_widget)
         splitter.addWidget(right_widget)
-        # --- RESPONSIVE FIX: Proportional sizes so it scales gracefully ---
         splitter.setStretchFactor(0, 7)
         splitter.setStretchFactor(1, 3)
         
         main_layout.addWidget(splitter)
         
-        # Bottom Buttons
-        # --- RESPONSIVE FIX: Allow buttons to wrap or squeeze if needed ---
         button_layout = QHBoxLayout()
         
         save_btn = QPushButton("Save Config")
@@ -596,10 +569,11 @@ class ConfigGUI(QMainWindow):
         content = QWidget()
         layout = QVBoxLayout(content)
         
-        mode_group = QGroupBox("Control Mode")
+        # --- EXPLICIT CONTROL MODE GROUP ---
+        mode_group = QGroupBox("Tracking Control Mode")
         mode_layout = QVBoxLayout()
-        self.absolute_radio = QCheckBox("Absolute Mode (Direct 1:1)")
-        self.relative_radio = QCheckBox("Relative Mode (Joystick-like)")
+        self.absolute_radio = QCheckBox("Absolute Mode (Direct 1:1 Mapping)")
+        self.relative_radio = QCheckBox("Relative Mode (Joystick-like Movement)")
         
         self.mode_btn_group = QButtonGroup()
         self.mode_btn_group.addButton(self.absolute_radio)
@@ -616,9 +590,50 @@ class ConfigGUI(QMainWindow):
         mode_group.setLayout(mode_layout)
         layout.addWidget(mode_group)
         
+        # --- EXPLICIT CLICKING METHOD GROUP ---
+        clicking_group = QGroupBox("Automated Clicking Method")
+        clicking_layout = QVBoxLayout()
+        
+        self.clicking_combo = QComboBox()
+        self.clicking_combo.addItem("None (Standard Mouse Click)", "none")
+        self.clicking_combo.addItem("Eye Blink (Double Blink)", "blink")
+        self.clicking_combo.addItem("Dwell Time (Hold Still)", "dwell")
+        
+        current_click = self.config.get("control", {}).get("clicking_method", "none")
+        idx = self.clicking_combo.findData(current_click)
+        if idx >= 0:
+            self.clicking_combo.setCurrentIndex(idx)
+            
+        click_desc_label = QLabel()
+        click_desc_label.setWordWrap(True)
+        click_desc_label.setStyleSheet("color: #666666; font-size: 11px; margin-top: 5px;")
+        
+        def update_click_desc():
+            val = self.clicking_combo.currentData()
+            self.update_control_config("clicking_method", val)
+            if val == "none":
+                click_desc_label.setText("Standard physical mouse clicks. No automatic clicking from camera.")
+            elif val == "blink":
+                click_desc_label.setText("Click by deliberately blinking your eyes (uses Eye Aspect Ratio).")
+            elif val == "dwell":
+                click_desc_label.setText("Click by holding the cursor perfectly still within a small area for 2 seconds.")
+                
+        self.clicking_combo.currentIndexChanged.connect(update_click_desc)
+        update_click_desc() # initialize text
+        
+        clicking_layout.addWidget(self.clicking_combo)
+        clicking_layout.addWidget(click_desc_label)
+        clicking_group.setLayout(clicking_layout)
+        layout.addWidget(clicking_group)
+
+        # --- GENERAL CONTROL THRESHOLDS ---
         control_config = self.config.get("control", {})
-        flat_control = {k: v for k, v in control_config.items() if not isinstance(v, dict)}
-        layout.addWidget(ConfigSectionWidget("General Control", ConfigDefinitions.CONTROL_DESCRIPTIONS, flat_control, self.update_control_config))
+        # Filter out mode and click method since we built custom boxes for them
+        flat_control = {k: v for k, v in control_config.items() 
+                        if not isinstance(v, dict) and k not in ["default_mode", "clicking_method"]}
+        
+        if flat_control:
+            layout.addWidget(ConfigSectionWidget("General Thresholds", ConfigDefinitions.CONTROL_DESCRIPTIONS, flat_control, self.update_control_config))
         
         relative_config = control_config.get("relative", {})
         if relative_config:
@@ -763,7 +778,14 @@ class ConfigGUI(QMainWindow):
             "camera": {"id": 0, "resolution": "640x480"},
             "tracking": {"yaw_range": 20, "pitch_range": 10, "filter_length": 8, "invert_x": True, "invert_y": True, "min_detection_confidence": 0.5, "min_tracking_confidence": 0.5},
             "smoothing": {"process_interval": 0.01},
-            "control": {"default_mode": "absolute", "clicking_method": "none", "start_mouse_enabled": True, "movement_threshold_px": 0.5, "pixel_deadzone_radius": 2.0, "relative": {"max_speed_px_per_s": 1800.0, "deadzone_deg": 1.5, "expo": 1.6}},
+            "control": {
+                "default_mode": "absolute", 
+                "clicking_method": "none", 
+                "start_mouse_enabled": True, 
+                "movement_threshold_px": 0.5, 
+                "pixel_deadzone_radius": 2.0, 
+                "relative": {"max_speed_px_per_s": 1800.0, "deadzone_deg": 1.5, "expo": 1.6}
+            },
             "filter": {"type": "kalman", "ema": {"alpha": 0.55}, "kalman": {"dt": 1.0, "process_noise": 0.002, "measurement_noise": 0.08}},
             "profiles": {"active": "BALANCED", "FAST": {}, "BALANCED": {}, "SMOOTH": {}},
             "calibration": {"file": "head_calibration.json", "autosave": True, "samples": 30},
@@ -818,11 +840,7 @@ class ConfigGUI(QMainWindow):
 
         try:
             import subprocess
-            
-            # Using your current backup file as requested in the uploaded structure
             main_script = os.path.join(os.path.dirname(__file__), "head_tracking_control.py")
-            if not os.path.exists(main_script):
-                main_script = os.path.join(os.path.dirname(__file__), "head_tracking_control_backup.py")
 
             if os.path.exists(main_script):
                 env = os.environ.copy()
@@ -837,7 +855,7 @@ class ConfigGUI(QMainWindow):
 
                 self.close()   
             else:
-                QMessageBox.critical(self, "Error", f"Could not find control script.")
+                QMessageBox.critical(self, "Error", f"Could not find head_tracking_control.py.")
                 self.show()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to start tracking: {e}")
@@ -850,8 +868,6 @@ def main():
     font.setPointSize(10)
     app.setFont(font)
     window = ConfigGUI()
-    
-    # --- RESPONSIVE FIX: Auto-Maximize for the Raspberry Pi Touchscreen ---
     window.showMaximized()
     
     sys.exit(app.exec())

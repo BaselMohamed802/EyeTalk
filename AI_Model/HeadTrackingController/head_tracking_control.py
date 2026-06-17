@@ -5,18 +5,7 @@ Date: 2/1/2026
 
 Description:
     Head Tracking Mouse Control System (Config-driven, FULL SCRIPT)
-
-    Linux/RPi compatibility update:
-      - Removed `keyboard` library (requires root on Linux)
-      - Hotkeys handled via OpenCV `cv2.waitKey()` (works without sudo)
-      - Config/calibration paths resolved relative to script directory
-
-Hotkeys (OpenCV window must be focused):
-  7  : Toggle mouse control   (F7 is not reliable in OpenCV on Linux)
-  C  : Calibrate (uses calibration.samples)
-  P  : Cycle profiles (FAST -> BALANCED -> SMOOTH)
-  M  : Toggle mode (absolute <-> relative)
-  Q  : Quit
+    Features fully decoupled clicking integrations (Blink and Dwell).
 """
 
 import os
@@ -56,22 +45,6 @@ except Exception:
     from mouse_controller import MouseController
     from filterManager import FilterManager
 
-# Blink detector
-try:
-    from blink_detector import BlinkDetector
-except ImportError:
-    # Fallback if file is not in the same directory
-    sys.path.insert(0, THIS_DIR)
-    from blink_detector import BlinkDetector
-
-# Dwell detector
-try:
-    from dwell_detector import DwellDetector
-except ImportError:
-    sys.path.insert(0, THIS_DIR)
-    from dwell_detector import DwellDetector
-
-
 # -----------------------------
 # Constants
 # -----------------------------
@@ -88,12 +61,10 @@ PROFILE_ORDER = ["FAST", "BALANCED", "SMOOTH"]
 WINDOW_MAIN = "Head Tracking Mouse Control"
 WINDOW_LANDMARKS = "Facial Landmarks"
 
-
 # -----------------------------
 # Config utilities
 # -----------------------------
 def deep_merge(base: dict, override: dict) -> dict:
-    """Recursively merge override into base (returns new dict)."""
     out = dict(base)
     for k, v in (override or {}).items():
         if isinstance(v, dict) and isinstance(out.get(k), dict):
@@ -102,14 +73,7 @@ def deep_merge(base: dict, override: dict) -> dict:
             out[k] = v
     return out
 
-
 def _find_config_path(filename: str = "config.yaml") -> str | None:
-    """
-    Try to find config.yaml in common locations:
-      1) next to this script
-      2) project root (parent of THIS_DIR)
-      3) current working directory
-    """
     candidates = [
         os.path.join(THIS_DIR, filename),
         os.path.join(PROJECT_ROOT, filename),
@@ -120,12 +84,7 @@ def _find_config_path(filename: str = "config.yaml") -> str | None:
             return p
     return None
 
-
 def load_config(path: str = "config.yaml") -> dict:
-    """
-    Loads config.yaml and merges missing keys with defaults.
-    If missing, returns defaults (so code still runs).
-    """
     defaults = {
         "camera": {"id": 0, "resolution": "640x480"},
         "tracking": {
@@ -140,6 +99,7 @@ def load_config(path: str = "config.yaml") -> dict:
         "smoothing": {"process_interval": 0.01},
         "control": {
             "default_mode": "absolute",
+            "clicking_method": "none",
             "start_mouse_enabled": True,
             "movement_threshold_px": 0.5,
             "pixel_deadzone_radius": 2.0,
@@ -158,22 +118,8 @@ def load_config(path: str = "config.yaml") -> dict:
         "calibration": {"file": "head_calibration.json", "autosave": True, "samples": 30},
         "mouse": {"update_interval": 0.01},
         "display": {"show_landmarks": True, "show_cube": True, "show_gaze_ray": True},
-        "clicking": {
-            "method": "disabled",
-            "blink": {
-                "ear_threshold": 0.22,
-                "consec_frames": 2,
-                "cooldown_sec": 1.0,
-                "use_both_eyes": False,
-            },
-            "dwell": {
-                "dwell_time_sec": 2.0,
-                "tolerance_px": 30.0,
-            }
-        }
     }
 
-    # Resolve config path robustly if given a bare filename
     cfg_path = path
     if not os.path.isabs(cfg_path):
         found = _find_config_path(os.path.basename(cfg_path))
@@ -191,9 +137,7 @@ def load_config(path: str = "config.yaml") -> dict:
         print(f"[Config] Failed reading config.yaml: {e}. Using defaults.")
         return defaults
 
-
 def get_effective_config(cfg: dict, profile_name: str) -> dict:
-    """Applies profiles.<PROFILE> overrides on top of base config."""
     profiles = cfg.get("profiles", {}) or {}
     prof_block = (profiles.get(profile_name, {}) or {})
     return deep_merge(cfg, prof_block)
@@ -206,30 +150,25 @@ def wrap_deg(angle: float) -> float:
     a = (angle + 180.0) % 360.0 - 180.0
     return 180.0 if a == -180.0 else a
 
-
 def angle_diff_deg(a: float, b: float) -> float:
     return wrap_deg(a - b)
 
-
 def clamp(v: float, lo: float, hi: float) -> float:
     return lo if v < lo else hi if v > hi else v
-
 
 def dist2(x1: float, y1: float, x2: float, y2: float) -> float:
     dx = x1 - x2
     dy = y1 - y2
     return dx * dx + dy * dy
 
-
 # -----------------------------
-# Calibration (robust median + persistence)
+# Calibration
 # -----------------------------
 @dataclass
 class HeadCalibration:
     center_yaw_deg: float = 0.0
     center_pitch_deg: float = 0.0
     calibrated: bool = False
-
 
 class CalibrationManager:
     def __init__(self):
@@ -307,16 +246,11 @@ class CalibrationManager:
             print(f"[Calibration] Load failed: {e}")
             return False
 
-
-# -----------------------------
-# HeadTracker buffer resize (preserve state; no re-instantiation)
-# -----------------------------
 def resize_headtracker_buffers(head_tracker: HeadTracker, new_len: int):
     new_len = int(max(1, new_len))
     if getattr(head_tracker, "filter_length", None) == new_len:
         return
 
-    # Preserve last values as seed
     try:
         last_origin = head_tracker.ray_origins[-1] if len(head_tracker.ray_origins) else np.array([0.0, 0.0, 0.0], dtype=float)
         last_dir = head_tracker.ray_directions[-1] if len(head_tracker.ray_directions) else np.array([0.0, 0.0, -1.0], dtype=float)
@@ -324,7 +258,6 @@ def resize_headtracker_buffers(head_tracker: HeadTracker, new_len: int):
         last_origin = np.array([0.0, 0.0, 0.0], dtype=float)
         last_dir = np.array([0.0, 0.0, -1.0], dtype=float)
 
-    # Preserve old offsets (even if unused)
     yaw_off = getattr(head_tracker, "calibration_offset_yaw", 0.0)
     pit_off = getattr(head_tracker, "calibration_offset_pitch", 0.0)
 
@@ -339,47 +272,35 @@ def resize_headtracker_buffers(head_tracker: HeadTracker, new_len: int):
     head_tracker.calibration_offset_yaw = yaw_off
     head_tracker.calibration_offset_pitch = pit_off
 
-
 # -----------------------------
-# Control core (mapping + cursor-space filtering)
+# Control core
 # -----------------------------
 class HeadControlCore:
     def __init__(self, screen_w: int, screen_h: int, yaw_range_deg: float, pitch_range_deg: float):
         self.screen_w = int(screen_w)
         self.screen_h = int(screen_h)
 
-        # Absolute sensitivity (config-driven)
         self.yaw_range = float(yaw_range_deg)
         self.pitch_range = float(pitch_range_deg)
 
-        # Inversion (config-driven)
         self.invert_x = True
         self.invert_y = True
+        self.mode = "absolute" 
 
-        # Modes
-        self.mode = "absolute"  # absolute | relative
-
-        # Gating
         self.movement_threshold_px = 0.5
         self.pixel_deadzone_radius = 2.0
 
-        # Relative mode tuning
         self.max_speed_px_per_s = 1800.0
         self.relative_deadzone_deg = 1.5
         self.relative_expo = 1.6
 
-        # Integrator state (relative)
         self._cursor_x = self.screen_w / 2.0
         self._cursor_y = self.screen_h / 2.0
-
         self._last_sent_x = None
         self._last_sent_y = None
         self._last_t = None
 
-        # Filter (config-driven)
         self.filter = FilterManager(filter_type="kalman", dt=1.0, process_noise=0.002, measurement_noise=0.08)
-
-        # Calibration
         self.cal_mgr = CalibrationManager()
 
     def toggle_mode(self):
@@ -403,7 +324,6 @@ class HeadControlCore:
         if self.cal_mgr.is_calibrating:
             self.cal_mgr.add_sample(yaw, pitch)
 
-        # Auto-initialize center if not calibrated (pragmatic)
         if not self.cal_mgr.cal.calibrated:
             self.cal_mgr.cal.center_yaw_deg = yaw
             self.cal_mgr.cal.center_pitch_deg = pitch
@@ -412,27 +332,21 @@ class HeadControlCore:
         dyaw = angle_diff_deg(yaw, self.cal_mgr.cal.center_yaw_deg)
         dpitch = angle_diff_deg(pitch, self.cal_mgr.cal.center_pitch_deg)
 
-        # Apply inversion
-        if self.invert_x:
-            dyaw = -dyaw
-        if self.invert_y:
-            dpitch = -dpitch
+        if self.invert_x: dyaw = -dyaw
+        if self.invert_y: dpitch = -dpitch
 
-        # dt
         if self._last_t is None:
             dt = 1.0 / 60.0
         else:
             dt = max(1e-4, now - self._last_t)
         self._last_t = now
 
-        # Map -> raw
         if self.mode == "absolute":
             nx = clamp(dyaw / self.yaw_range, -1.0, 1.0)
             ny = clamp(dpitch / self.pitch_range, -1.0, 1.0)
             raw_x = (self.screen_w / 2.0) + nx * (self.screen_w / 2.0)
             raw_y = (self.screen_h / 2.0) + ny * (self.screen_h / 2.0)
         else:
-            # Relative (joystick-like)
             dz = self.relative_deadzone_deg
             ax = 0.0 if abs(dyaw) < dz else dyaw
             ay = 0.0 if abs(dpitch) < dz else dpitch
@@ -451,19 +365,15 @@ class HeadControlCore:
             self._cursor_y += vy * dt
             raw_x, raw_y = self._cursor_x, self._cursor_y
 
-        # Clamp raw
         raw_x = clamp(raw_x, 0.0, float(self.screen_w - 1))
         raw_y = clamp(raw_y, 0.0, float(self.screen_h - 1))
 
-        # Filter in cursor space
         fx, fy = self.filter.apply_filter(raw_x, raw_y)
 
-        # Pixel deadzone AFTER filtering
         if self.pixel_deadzone_radius > 0.0 and self._last_sent_x is not None and self._last_sent_y is not None:
             if dist2(fx, fy, self._last_sent_x, self._last_sent_y) < (self.pixel_deadzone_radius ** 2):
                 fx, fy = self._last_sent_x, self._last_sent_y
 
-        # Movement threshold gating
         if self._last_sent_x is None or self._last_sent_y is None:
             should_send = True
         else:
@@ -473,27 +383,14 @@ class HeadControlCore:
             self._last_sent_x, self._last_sent_y = fx, fy
 
         dbg = {
-            "yaw": yaw,
-            "pitch": pitch,
-            "dyaw": dyaw,
-            "dpitch": dpitch,
-            "raw_x": raw_x,
-            "raw_y": raw_y,
-            "fx": fx,
-            "fy": fy,
-            "dt": dt,
-            "mode": self.mode,
+            "fx": fx, "fy": fy, "dt": dt, "mode": self.mode,
             "calibrating": self.cal_mgr.is_calibrating,
             "calib_progress": self.cal_mgr.progress() if self.cal_mgr.is_calibrating else None,
         }
         return should_send, float(fx), float(fy), dbg
 
 
-# -----------------------------
-# Apply config to runtime
-# -----------------------------
 def apply_effective_config(eff: dict, head_tracker: HeadTracker, core: HeadControlCore):
-    # Tracking
     core.yaw_range = float(eff["tracking"]["yaw_range"])
     core.pitch_range = float(eff["tracking"]["pitch_range"])
     core.invert_x = bool(eff["tracking"].get("invert_x", True))
@@ -501,7 +398,6 @@ def apply_effective_config(eff: dict, head_tracker: HeadTracker, core: HeadContr
 
     resize_headtracker_buffers(head_tracker, int(eff["tracking"]["filter_length"]))
 
-    # Control
     core.mode = str(eff["control"].get("default_mode", core.mode)).lower()
     core.movement_threshold_px = float(eff["control"]["movement_threshold_px"])
     core.pixel_deadzone_radius = float(eff["control"]["pixel_deadzone_radius"])
@@ -511,7 +407,6 @@ def apply_effective_config(eff: dict, head_tracker: HeadTracker, core: HeadContr
     core.relative_deadzone_deg = float(rel.get("deadzone_deg", core.relative_deadzone_deg))
     core.relative_expo = float(rel.get("expo", core.relative_expo))
 
-    # Filter
     fcfg = eff.get("filter", {}) or {}
     ftype = str(fcfg.get("type", "kalman")).lower()
 
@@ -530,13 +425,12 @@ def apply_effective_config(eff: dict, head_tracker: HeadTracker, core: HeadContr
     except Exception:
         pass
 
-    # Loop interval
     process_interval = float((eff.get("smoothing", {}) or {}).get("process_interval", 0.01))
     return process_interval
 
 
 # -----------------------------
-# Main
+# Main Tracking Loop
 # -----------------------------
 def main():
     print("Head Tracking Mouse Control System (Config-driven)")
@@ -544,53 +438,22 @@ def main():
 
     cfg = load_config("config.yaml")
 
-    # Display
     SHOW_LANDMARKS = bool(cfg["display"].get("show_landmarks", True))
     SHOW_CUBE = bool(cfg["display"].get("show_cube", True))
     SHOW_GAZE_RAY = bool(cfg["display"].get("show_gaze_ray", True))
 
-    # Calibration config
     cal_cfg = cfg.get("calibration", {}) or {}
-    cal_file_cfg = str(cal_cfg.get("file", "head_calibration.json"))
+    CAL_FILE = str(cal_cfg.get("file", "head_calibration.json"))
+    if not os.path.isabs(CAL_FILE):
+        CAL_FILE = os.path.join(THIS_DIR, CAL_FILE)
     CAL_AUTOSAVE = bool(cal_cfg.get("autosave", True))
     CAL_SAMPLES = int(cal_cfg.get("samples", 30))
 
-    # Resolve calibration file path relative to script if it is relative
-    CAL_FILE = cal_file_cfg
-    if not os.path.isabs(CAL_FILE):
-        CAL_FILE = os.path.join(THIS_DIR, CAL_FILE)
-
-    # Clicking configuration
-    click_cfg = cfg.get("clicking", {})
-    click_method = click_cfg.get("method", "disabled")
-    blink_params = click_cfg.get("blink", {})
-    dwell_params = click_cfg.get("dwell", {})
-    blink_detector = None
-    dwell_detector = None
-    if click_method == "blink":
-        blink_detector = BlinkDetector(
-            ear_threshold=blink_params.get("ear_threshold", 0.22),
-            consec_frames=blink_params.get("consec_frames", 2),
-            cooldown_sec=blink_params.get("cooldown_sec", 1.0),
-            use_both_eyes=blink_params.get("use_both_eyes", False)
-        )
-        print("[Clicking] Eye blink click enabled")
-    elif click_method == "dwell":
-        dwell_detector = DwellDetector(
-            dwell_time_sec=dwell_params.get("dwell_time_sec", 2.0),
-            tolerance_px=dwell_params.get("tolerance_px", 30.0)
-        )
-        print("[Clicking] Dwell click enabled")
-    else:
-        print("[Clicking] Click method: disabled (manual click)")
-
-    # Starting profile
     active_profile = str((cfg.get("profiles", {}) or {}).get("active", "BALANCED")).upper()
     if active_profile not in PROFILE_ORDER:
         active_profile = "BALANCED"
     profile_idx = PROFILE_ORDER.index(active_profile)
 
-    # 1) Camera selection (Auto-selects from Config)
     print("\nScanning for cameras...")
     cameras = print_camera_info()
     if not cameras:
@@ -608,14 +471,12 @@ def main():
         cam_id = camera_ports[0]
         print(f"\nUsing default camera at port {cam_id}")
 
-    # Parse configured resolution
     res_str = cam_cfg.get("resolution", "640x480")
     try:
         cam_w, cam_h = map(int, res_str.split('x'))
     except Exception:
         cam_w, cam_h = 640, 480
 
-    # 2) Init modules
     print("\nInitializing components...")
     try:
         camera = IrisCamera(cam_id, cam_width=cam_w, cam_height=cam_h)
@@ -634,7 +495,7 @@ def main():
     head_tracker = HeadTracker(filter_length=int(cfg["tracking"]["filter_length"]))
 
     mouse_controller = MouseController(
-        update_interval=float(cfg["mouse"]["update_interval"]),
+        update_interval=float(cfg.get("mouse", {}).get("update_interval", 0.01)),
         enable_failsafe=False,
     )
     mouse_controller.start()
@@ -646,24 +507,48 @@ def main():
         pitch_range_deg=float(cfg["tracking"]["pitch_range"]),
     )
 
-    # Load calibration if present
     if core.cal_mgr.load(CAL_FILE):
         print(f"[Calibration] Loaded from {CAL_FILE}")
 
-    # Apply active profile effective config
     current_profile_name = PROFILE_ORDER[profile_idx]
     eff = get_effective_config(cfg, current_profile_name)
     PROCESS_INTERVAL = apply_effective_config(eff, head_tracker, core)
-
-    # Startup mouse enabled
     mouse_control_enabled = bool((eff.get("control", {}) or {}).get("start_mouse_enabled", True))
-
-    # Thread lock for mouse updates
     mouse_lock = threading.Lock()
 
-    # -----------------------------
-    # Hotkeys (from config.yaml)
-    # -----------------------------
+    # --- CLICKING INTEGRATION ---
+    clicking_method = str((eff.get("control", {}) or {}).get("clicking_method", "none")).lower()
+    
+    blink_detector = None
+    dwell_detector = None
+    
+    if clicking_method == "blink":
+        try:
+            from blink_detector import BlinkDetector
+            blink_cfg = cfg.get("clicking", {}).get("blink", {})
+            blink_detector = BlinkDetector(
+                ear_threshold=float(blink_cfg.get("ear_threshold", 0.22)),
+                consec_frames=int(blink_cfg.get("consec_frames", 2)),
+                cooldown_sec=float(blink_cfg.get("cooldown_sec", 1.0)),
+                use_both_eyes=bool(blink_cfg.get("use_both_eyes", False))
+            )
+            print(f"\n[Control] Eye Blink Clicking Enabled")
+        except ImportError as e:
+            print(f"\n[WARNING] Could not import BlinkDetector: {e}")
+            
+    elif clicking_method == "dwell":
+        try:
+            from dwell_detector import DwellDetector
+            dwell_cfg = cfg.get("clicking", {}).get("dwell", {})
+            dwell_detector = DwellDetector(
+                dwell_time_sec=float(dwell_cfg.get("dwell_time_sec", 2.0)),
+                tolerance_px=float(dwell_cfg.get("tolerance_px", 30.0))
+            )
+            print(f"\n[Control] Dwell Clicking Enabled")
+        except ImportError as e:
+            print(f"\n[WARNING] Could not import DwellDetector: {e}")
+    # ----------------------------
+
     hk = (cfg.get("hotkeys", {}) or {})
     KEY_TOGGLE = str(hk.get("toggle_mouse", "7")).lower()
     KEY_CALIB  = str(hk.get("calibrate", "c")).lower()
@@ -672,7 +557,6 @@ def main():
     KEY_QUIT   = str(hk.get("quit", "q")).lower()
 
     def _key_match(k: int, key: str) -> bool:
-        # OpenCV gives ASCII for regular keys; support "space"
         if key in ("space", " "):
             return k == 32
         if not key:
@@ -682,14 +566,9 @@ def main():
     print("\nHotkeys (focus the OpenCV window):")
     print(f"  {KEY_TOGGLE.upper()} : Toggle mouse control")
     print(f"  {KEY_CALIB.upper()} : Calibrate")
-    print(f"  {KEY_PROF.upper()} : Cycle profiles (FAST/BALANCED/SMOOTH)")
-    print(f"  {KEY_MODE.upper()} : Toggle mode (absolute/relative)")
-    print(f"  {KEY_QUIT.upper()} : Quit")
-
-    print(f"\nActive profile: {current_profile_name}")
-    print(f"Mode: {core.mode}")
-    print(f"Invert: X={core.invert_x}, Y={core.invert_y}")
-    print(f"Calibration file: {CAL_FILE}")
+    print(f"  {KEY_PROF.upper()} : Cycle profiles")
+    print(f"  {KEY_MODE.upper()} : Toggle mode")
+    print(f"  {KEY_QUIT.upper()} : Quit\n")
 
     last_processed_time = time.time()
     prev_calibrating = False
@@ -698,7 +577,6 @@ def main():
         while camera.is_opened():
             now = time.time()
 
-            # Frame rate limiting
             if now - last_processed_time < PROCESS_INTERVAL:
                 time.sleep(0.001)
                 continue
@@ -709,7 +587,6 @@ def main():
                 continue
 
             cam_width, cam_height = camera.get_resolution()
-
             landmarks_frame, landmarks_list_3d = face_detector.get_landmarks_as_pixels(frame)
 
             yaw_deg = 0.0
@@ -720,19 +597,6 @@ def main():
             if landmarks_list_3d:
                 landmarks_dict = {idx: (x, y, z) for idx, x, y, z in landmarks_list_3d}
 
-                # ----- Blink click detection -----
-                if blink_detector is not None:
-                    # Get raw normalised landmarks from face_detector (requires small mod in face_utils.py)
-                    raw_landmarks = getattr(face_detector, 'last_raw_landmarks', None)
-                    if raw_landmarks is not None:
-                        clicked = blink_detector.process(raw_landmarks.landmark, cam_width, cam_height)
-                        if clicked:
-                            pyautogui.click()
-                            # Visual feedback
-                            cv2.putText(frame, "BLINK CLICK!", (cam_width//2 - 70, cam_height//2),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
-                # ---------------------------------
-
                 if SHOW_LANDMARKS:
                     for idx, x, y, z in landmarks_list_3d:
                         color = (155, 155, 155) if idx in FACE_OUTLINE_INDICES else (255, 25, 10)
@@ -740,16 +604,11 @@ def main():
                         cv2.circle(frame, (x, y), 1, (255, 255, 255), -1)
 
                 key_points_indices = {
-                    "left": 234,
-                    "right": 454,
-                    "top": 10,
-                    "bottom": 152,
-                    "front": 1
+                    "left": 234, "right": 454, "top": 10, "bottom": 152, "front": 1
                 }
 
                 missing = [name for name, idx in key_points_indices.items() if idx not in landmarks_dict]
                 if not missing:
-                    # Extract key points (3D)
                     key_points_3d = {}
                     for name, idx in key_points_indices.items():
                         x, y, z = landmarks_dict[idx]
@@ -757,45 +616,46 @@ def main():
 
                     orientation = head_tracker.calculate_head_orientation(key_points_3d)
 
-                    # Update smoothing buffers (HeadTracker internal averaging)
                     head_tracker.update_smoothing_buffers(orientation["center"], orientation["forward_axis"])
                     smoothed_origin, smoothed_direction = head_tracker.get_smoothed_orientation()
 
-                    # Compute yaw/pitch (continuous degrees)
                     yaw_deg, pitch_deg = head_tracker.calculate_yaw_pitch(smoothed_direction)
                     yaw_deg = wrap_deg(yaw_deg)
                     pitch_deg = wrap_deg(pitch_deg)
 
-                    # Control -> cursor target
                     should_send, fx, fy, dbg = core.update(yaw_deg, pitch_deg, now=now)
                     screen_x, screen_y = fx, fy
 
                     if mouse_control_enabled and should_send:
                         with mouse_lock:
                             mouse_controller.set_target(screen_x, screen_y)
+                            
+                    # --- CLICKING PROCESS LOOP ---
+                    if mouse_control_enabled:
+                        if clicking_method == "blink" and blink_detector is not None:
+                            if face_detector.results and face_detector.results.multi_face_landmarks:
+                                raw_face_lms = face_detector.results.multi_face_landmarks[0].landmark
+                                if blink_detector.process(raw_face_lms, cam_width, cam_height):
+                                    pyautogui.click()
+                                    cv2.putText(frame, "BLINK CLICK!", (10, 210), 
+                                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
+                                                
+                        elif clicking_method == "dwell" and dwell_detector is not None:
+                            if screen_x is not None and screen_y is not None:
+                                if dwell_detector.process(screen_x, screen_y):
+                                    pyautogui.click()
+                                    cv2.putText(frame, "DWELL CLICK!", (10, 210), 
+                                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 150, 0), 2)
+                    # -----------------------------
 
-                    # ----- Dwell click detection (uses screen_x, screen_y) -----
-                    if dwell_detector is not None and screen_x is not None and screen_y is not None:
-                        clicked = dwell_detector.process(screen_x, screen_y)
-                        if clicked:
-                            pyautogui.click()
-                            cv2.putText(frame, "DWELL CLICK!", (cam_width//2 - 70, cam_height//2),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
-                    # ------------------------------------------------------------
-
-                    # Visualization: cube
                     if SHOW_CUBE:
                         cube_corners = head_tracker.generate_head_cube(
-                            orientation["center"],
-                            orientation["right_axis"],
-                            orientation["up_axis"],
-                            orientation["forward_axis"],
-                            orientation["half_width"],
-                            orientation["half_height"]
+                            orientation["center"], orientation["right_axis"],
+                            orientation["up_axis"], orientation["forward_axis"],
+                            orientation["half_width"], orientation["half_height"]
                         )
                         face_detector.draw_head_cube(frame, cube_corners)
 
-                    # Visualization: ray
                     if SHOW_GAZE_RAY:
                         ray_origin_2d = smoothed_origin[:2]
                         ray_dir_2d = smoothed_direction[:2]
@@ -803,13 +663,6 @@ def main():
                         if nrm > 0:
                             ray_dir_2d = ray_dir_2d / nrm
                         face_detector.draw_simple_gaze_ray(frame, ray_origin_2d, ray_dir_2d, length=200)
-                        face_detector.draw_simple_gaze_ray(landmarks_frame, ray_origin_2d, ray_dir_2d, length=200)
-
-                    # Draw key points
-                    for name, idx in key_points_indices.items():
-                        x, y, z = landmarks_dict[idx]
-                        cv2.circle(frame, (x, y), 4, (0, 0, 0), -1)
-                        cv2.circle(frame, (x, y), 3, (255, 0, 255), -1)
 
             # UI overlays
             cv2.putText(frame, f"Yaw: {yaw_deg:+.1f}, Pitch: {pitch_deg:+.1f}",
@@ -819,7 +672,7 @@ def main():
                         (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
                         (0, 255, 0) if mouse_control_enabled else (0, 0, 255), 2)
 
-            cv2.putText(frame, f"Profile: {current_profile_name}",
+            cv2.putText(frame, f"Clicking: {clicking_method.upper()}",
                         (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
             cv2.putText(frame, f"Mode: {core.mode.upper()}",
@@ -841,10 +694,6 @@ def main():
             cv2.imshow(WINDOW_MAIN, frame)
             cv2.imshow(WINDOW_LANDMARKS, landmarks_frame)
 
-            # -----------------------------
-            # Keyboard handling (OpenCV waitKey, cross-platform, no root)
-            # NOTE: window must be focused.
-            # -----------------------------
             k = cv2.waitKey(1) & 0xFF
             if k != 255:
                 if _key_match(k, KEY_QUIT):
@@ -863,19 +712,20 @@ def main():
                     current_profile_name = PROFILE_ORDER[profile_idx]
                     eff = get_effective_config(cfg, current_profile_name)
                     PROCESS_INTERVAL = apply_effective_config(eff, head_tracker, core)
-                    print(f"[Profile] Switched to {current_profile_name} (process_interval={PROCESS_INTERVAL})")
+                    
+                    # Refresh clicking method on profile change
+                    clicking_method = str((eff.get("control", {}) or {}).get("clicking_method", clicking_method)).lower()
+                    print(f"[Profile] Switched to {current_profile_name}")
 
                 if _key_match(k, KEY_MODE):
                     core.toggle_mode()
                     print(f"[Mode] Switched to {core.mode}")
 
-            # Auto-save calibration when it finishes
             if prev_calibrating and (not core.cal_mgr.is_calibrating) and CAL_AUTOSAVE:
                 if core.cal_mgr.save(CAL_FILE):
                     print(f"[Calibration] Saved to {CAL_FILE}")
             prev_calibrating = core.cal_mgr.is_calibrating
 
-            # Window closed
             if cv2.getWindowProperty(WINDOW_MAIN, cv2.WND_PROP_VISIBLE) < 1:
                 break
 
@@ -897,9 +747,7 @@ def main():
             pass
         cv2.destroyAllWindows()
         print("Cleanup complete.")
-        # HARD EXIT: Forces python to exit instantly, killing any rogue/dangling threads
         os._exit(0) 
-
 
 if __name__ == "__main__":
     main()

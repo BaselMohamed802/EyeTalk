@@ -14,6 +14,7 @@ clicking:
     tolerance_px: 30.0
 control:
   default_mode: absolute
+  clicking_method: none
   movement_threshold_px: 0.5
   pixel_deadzone_radius: 2.0
   relative:
