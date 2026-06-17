@@ -6,7 +6,7 @@ Date: 2/2/2026
 Description:
     PySide6 GUI configuration interface for Head Tracking Mouse Control System.
     Fully responsive layout optimized for 1024x600 Raspberry Pi touchscreens.
-    Integrated Clicking Method selections and strict absolute pathing.
+    Features dedicated UI groups for Control Modes and Clicking Methods with Advanced Parameters.
 """
 
 import sys
@@ -141,6 +141,42 @@ class ConfigDefinitions:
             description="Time step for Kalman filter (seconds)",
             min_val=0.1, max_val=2.0, step=0.1, unit="s"
         ),
+    }
+    
+    # --- NEW: BLINK & DWELL DESCRIPTIONS ---
+    BLINK_DESCRIPTIONS = {
+        "ear_threshold": ConfigDescription(
+            name="EAR Threshold",
+            description="Eye Aspect Ratio to register a blink (lower = must squeeze eyes tighter)",
+            min_val=0.10, max_val=0.40, step=0.01
+        ),
+        "consec_frames": ConfigDescription(
+            name="Consecutive Frames",
+            description="Frames the eye must stay closed to count as a click (prevents accidental flinches)",
+            min_val=1, max_val=10, step=1
+        ),
+        "cooldown_sec": ConfigDescription(
+            name="Cooldown (Seconds)",
+            description="Delay after a click before another blink is allowed",
+            min_val=0.1, max_val=5.0, step=0.1, unit="s"
+        ),
+        "use_both_eyes": ConfigDescription(
+            name="Require Both Eyes",
+            description="If checked, both eyes must blink. Uncheck to allow winking."
+        )
+    }
+
+    DWELL_DESCRIPTIONS = {
+        "dwell_time_sec": ConfigDescription(
+            name="Dwell Time (Seconds)",
+            description="How long the cursor must stay completely still to trigger a click",
+            min_val=0.5, max_val=5.0, step=0.1, unit="s"
+        ),
+        "tolerance_px": ConfigDescription(
+            name="Dwell Radius (Pixels)",
+            description="How much the cursor is allowed to wiggle while waiting to click",
+            min_val=5.0, max_val=100.0, step=5.0, unit="px"
+        )
     }
     
     PROFILE_DESCRIPTIONS = {
@@ -335,6 +371,11 @@ class ConfigSectionWidget(QWidget):
             self._create_basic_group("Relative Mode Settings", ["max_speed_px_per_s", "deadzone_deg", "expo"], parent_layout)
         elif "alpha" in self.config_dict or "process_noise" in self.config_dict:
             self._create_filter_group(parent_layout)
+        # --- NEW: Added specific group names for Blink and Dwell settings ---
+        elif "ear_threshold" in self.config_dict:
+            self._create_basic_group("Blink Parameters", list(self.config_dict.keys()), parent_layout)
+        elif "dwell_time_sec" in self.config_dict:
+            self._create_basic_group("Dwell Parameters", list(self.config_dict.keys()), parent_layout)
         else:
             self._create_basic_group("Settings", list(self.config_dict.keys()), parent_layout)
     
@@ -350,7 +391,7 @@ class ConfigSectionWidget(QWidget):
                         description=f"Configure {param_name.replace('_', ' ')} setting"
                     ))
                 
-                if param_name in ["invert_x", "invert_y", "start_mouse_enabled"]:
+                if param_name in ["invert_x", "invert_y", "start_mouse_enabled", "use_both_eyes"]:
                     param_type = "bool"
                 elif param_name in ["type"]:
                     param_type = "choice"
@@ -641,6 +682,17 @@ class ConfigGUI(QMainWindow):
         relative_config = control_config.get("relative", {})
         if relative_config:
             layout.addWidget(ConfigSectionWidget("Relative Mode Settings", ConfigDefinitions.RELATIVE_DESCRIPTIONS, relative_config, self.update_relative_config))
+            
+        # --- NEW: BLINK & DWELL SETTINGS WIDGETS ---
+        blink_config = self.config.get("clicking", {}).get("blink", {})
+        if not blink_config:
+            blink_config = self.get_default_config()["clicking"]["blink"]
+        layout.addWidget(ConfigSectionWidget("Blink Configuration", ConfigDefinitions.BLINK_DESCRIPTIONS, blink_config, self.update_blink_config))
+        
+        dwell_config = self.config.get("clicking", {}).get("dwell", {})
+        if not dwell_config:
+            dwell_config = self.get_default_config()["clicking"]["dwell"]
+        layout.addWidget(ConfigSectionWidget("Dwell Configuration", ConfigDefinitions.DWELL_DESCRIPTIONS, dwell_config, self.update_dwell_config))
         
         scroll.setWidget(content)
         main_layout = QVBoxLayout(widget)
@@ -757,6 +809,14 @@ class ConfigGUI(QMainWindow):
     def update_filter_config(self, param: str, value):
         self.config.setdefault("filter", {})[param] = value
         self.modified = True
+        
+    def update_blink_config(self, param: str, value):
+        self.config.setdefault("clicking", {}).setdefault("blink", {})[param] = value
+        self.modified = True
+        
+    def update_dwell_config(self, param: str, value):
+        self.config.setdefault("clicking", {}).setdefault("dwell", {})[param] = value
+        self.modified = True
     
     def update_nested_config(self, section: str, param: str, value):
         self.config.setdefault(section, {})[param] = value
@@ -788,6 +848,19 @@ class ConfigGUI(QMainWindow):
                 "movement_threshold_px": 0.5, 
                 "pixel_deadzone_radius": 2.0, 
                 "relative": {"max_speed_px_per_s": 1800.0, "deadzone_deg": 1.5, "expo": 1.6}
+            },
+            # --- NEW: Added Default Dictionary for clicking logic ---
+            "clicking": {
+                "blink": {
+                    "ear_threshold": 0.22,
+                    "consec_frames": 2,
+                    "cooldown_sec": 1.0,
+                    "use_both_eyes": False
+                },
+                "dwell": {
+                    "dwell_time_sec": 2.0,
+                    "tolerance_px": 30.0
+                }
             },
             "filter": {"type": "kalman", "ema": {"alpha": 0.55}, "kalman": {"dt": 1.0, "process_noise": 0.002, "measurement_noise": 0.08}},
             "profiles": {"active": "BALANCED", "FAST": {}, "BALANCED": {}, "SMOOTH": {}},
