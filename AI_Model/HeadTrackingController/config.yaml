@@ -2,19 +2,22 @@ calibration:
   autosave: true
   file: head_calibration.json
   samples: 30
+camera:
+  id: 0
+  resolution: 640x480
 clicking:
-  method: disabled               # disabled | blink | dwell
   blink:
-    ear_threshold: 0.22
     consec_frames: 2
     cooldown_sec: 1.0
+    ear_threshold: 0.22
     use_both_eyes: false
   dwell:
     dwell_time_sec: 2.0
     tolerance_px: 30.0
+  method: disabled
 control:
+  clicking_method: dwell
   default_mode: absolute
-  clicking_method: none
   movement_threshold_px: 0.5
   pixel_deadzone_radius: 2.0
   relative:

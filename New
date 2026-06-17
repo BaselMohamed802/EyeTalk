@@ -1,0 +1,34 @@
+reanschwarzer@Dispatcher21:~/Work/EyeTalk $ /home/reanschwarzer/Work/EyeTalk/.venv/bin/python /home/reanschwarzer/Work/EyeTalk/AI_Model/HeadTrackingController/head_tracking_gui.py
+QColorSpace attempted constructed from invalid primaries: QPointF(0,0) QPointF(0,0) QPointF(0,0) QPointF(0,0)
+^CTraceback (most recent call last):
+  File "/home/reanschwarzer/Work/EyeTalk/AI_Model/HeadTrackingController/head_tracking_control.py", line 38, in <module>
+    from VisionModule.face_utils import FaceMeshDetector
+  File "/home/reanschwarzer/Work/EyeTalk/AI_Model/VisionModule/face_utils.py", line 16, in <module>
+    import mediapipe as mp
+  File "/home/reanschwarzer/Work/EyeTalk/.venv/lib/python3.12/site-packages/mediapipe/__init__.py", line 16, in <module>
+    import mediapipe.python.solutions as solutions 
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/reanschwarzer/Work/EyeTalk/.venv/lib/python3.12/site-packages/mediapipe/python/solutions/__init__.py", line 17, in <module>
+    import mediapipe.python.solutions.drawing_styles
+  File "/home/reanschwarzer/Work/EyeTalk/.venv/lib/python3.12/site-packages/mediapipe/python/solutions/drawing_styles.py", line 20, in <module>
+    from mediapipe.python.solutions.drawing_utils import DrawingSpec
+  File "/home/reanschwarzer/Work/EyeTalk/.venv/lib/python3.12/site-packages/mediapipe/python/solutions/drawing_utils.py", line 21, in <module>
+    import matplotlib.pyplot as plt
+  File "/home/reanschwarzer/Work/EyeTalk/.venv/lib/python3.12/site-packages/matplotlib/__init__.py", line 161, in <module>
+    from . import _api, _version, cbook, _docstring, rcsetup
+  File "/home/reanschwarzer/Work/EyeTalk/.venv/lib/python3.12/site-packages/matplotlib/rcsetup.py", line 29, in <module>
+    from matplotlib._fontconfig_pattern import parse_fontconfig_pattern
+  File "/home/reanschwarzer/Work/EyeTalk/.venv/lib/python3.12/site-packages/matplotlib/_fontconfig_pattern.py", line 15, in <module>
+    from pyparsing import (
+  File "/home/reanschwarzer/Work/EyeTalk/.venv/lib/python3.12/site-packages/pyparsing/__init__.py", line 148, in <module>
+    from .core import __diag__, __compat__
+  File "/home/reanschwarzer/Work/EyeTalk/.venv/lib/python3.12/site-packages/pyparsing/core.py", line 237, in <module>
+    identbodychars: str = pyparsing_unicode.Latin1.identbodychars
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/reanschwarzer/Work/EyeTalk/.venv/lib/python3.12/site-packages/pyparsing/unicode.py", line 24, in __get__
+    cls._intern[attrname] = self.fn(cls)
+                            ^^^^^^^^^^^^
+  File "/home/reanschwarzer/Work/EyeTalk/.venv/lib/python3.12/site-packages/pyparsing/unicode.py", line 109, in identbodychars
+    sorted(identifier_chars | set(cls.identchars) | set("0123456789·"))
+KeyboardInterrupt
+ source /home/reanschwarzer/Work/EyeTalk/.venv/bin/activate
