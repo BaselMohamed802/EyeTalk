@@ -6,7 +6,7 @@ Each button press appends characters to form words and sentences.
 
 from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton
 from PySide6.QtCore import Signal, Qt
-from PySide6.QtGui import QPixmap, QGuiApplication
+from PySide6.QtGui import QPixmap, QGuiApplication, QResizeEvent
 from TTS_Engine import TTS 
 
 class Widget_EN(QWidget):
@@ -22,42 +22,36 @@ class Widget_EN(QWidget):
         super().__init__()  # Initialize parent QWidget class
         
         # ============================================
-        # DYNAMIC SIZING BASED ON SCREEN RESOLUTION
+        # BASE SIZES (designed for 1024x600)
         # ============================================
-        screen = QGuiApplication.primaryScreen()
-        size = screen.size()
-        screen_w, screen_h = size.width(), size.height()
+        self.ref_w, self.ref_h = 1024, 600
         
-        # Reference: your 10" 1024x600 touchscreen
-        ref_w, ref_h = 600, 400
+        # Base values (at 1024x600)
+        self.base_font_size = 16
+        self.base_padding = 8
+        self.base_delete_font = 14
+        self.base_enter_font = 14
+        self.base_space_font = 14
+        self.base_space_padding = 12
         
-        # Compute scale as average of width and height ratios (like head_tracking_gui)
-        scale_w = screen_w / ref_w
-        scale_h = screen_h / ref_h
-        self.scale = (scale_w + scale_h) / 2.0
-        self.scale = max(0.7, min(self.scale, 1.8))  # clamp to avoid extremes
+        # Emergency buttons 
+        self.base_em_font = 18
+        self.base_em_padding = 8          
+        self.base_em_height = 45
+        self.base_em_min_width = 100
         
-        # Sizes derived from scale
-        font_size = int(16 * self.scale)
-        padding = int(5 * self.scale)
-        delete_font = int(14 * self.scale)
-        enter_font = int(14 * self.scale)
-        space_font = int(14 * self.scale)
-        space_padding = int(5 * self.scale)
+        self.base_logo_width = 500
+        self.base_logo_height = 400
+        self.base_layout_spacing = 6
+        self.base_layout_margin = 15
+        self.base_label_font = 15
         
-        # Emergency buttons
-        em_font = int(18 * self.scale)         
-        em_padding = int(10 * self.scale)      
-        em_height = int(19 * self.scale)        
-        em_min_width = int(100 * self.scale)    
+        # Text box 
+        self.base_text_holder_font = 18   
+        self.base_text_holder_padding = 10 
         
-        logo_width = int(400 * self.scale)
-        logo_height = int(100 * self.scale)
-        layout_spacing = int(5 * self.scale)
-        layout_margin = int(10 * self.scale)
-        label_font = int(15 * self.scale)
-        text_holder_font = int(20 * self.scale)
-        text_holder_padding = int(30 * self.scale)
+        # Current scale (will be computed in resizeEvent)
+        self.scale = 1.0
         
         # ============================================
         # WINDOW SETUP
@@ -72,290 +66,337 @@ class Widget_EN(QWidget):
         self.tts = TTS()
 
         #Creating a Label to hold Thebes's Logo 
-        Thebes_Logo = QPixmap(r"M:\University\Level 4\Shit_Project\EyeTalk\Documentation\Eye_Talk_Logo.png")
-        Thebes_Label = QLabel(self)
-        Scaled = Thebes_Logo.scaled(logo_width, logo_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        Thebes_Label.setPixmap(Scaled)
-        Thebes_Label.setAlignment(Qt.AlignCenter)  # <--- CENTRE THE LOGO
+        self.Thebes_Logo = QPixmap(r"M:\University\Level 4\Shit_Project\EyeTalk\Documentation\Eye_Talk_Logo.png")
+        self.Thebes_Label = QLabel(self)
+        self.Thebes_Label.setAlignment(Qt.AlignCenter)  # centre the logo
 
         # Label to show "Your Text:" prompt
-        Display_Label = QLabel("Your Text")
-        Display_Label.setObjectName("display_label")
-        Display_Label.setStyleSheet(f"""
-            QLabel#display_label {{
-                color: #FF4500;
-                qproperty-alignment: AlignCenter;
-                font-size: {label_font}px;
-                max-height: {label_font}px;
-            }}
-        """)
+        self.Display_Label = QLabel("Your Text")
+        self.Display_Label.setObjectName("display_label")
 
         # Label that displays the typed text (updates as user types)
         self.text_holder_label = QLabel("")
         self.text_holder_label.setObjectName("text_holder")
-        self.text_holder_label.setStyleSheet(f"""
-            QLabel#text_holder {{
-                padding: {text_holder_padding}px;
-                font-size: {text_holder_font}px;
-                border-radius: 5px;
-                background-color: #75706f;
-            }}
-        """)
+        self.text_holder_label.setWordWrap(False)       # force single line
+        self.text_holder_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
     
         # ============================================
         # KEYBOARD BUTTONS - ROW 1 (QWERTYUIOP)
         # ============================================
         # Create buttons for letters Q through P (top row of keyboard)
 
-        Letter_ButtonQ = QPushButton("Q")
-        Letter_ButtonQ.setObjectName("letter")
-        Letter_ButtonQ.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonQ = QPushButton("Q")
+        self.Letter_ButtonQ.setObjectName("letter")
+        self.Letter_ButtonQ.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonW = QPushButton("W")
-        Letter_ButtonW.setObjectName("letter")
-        Letter_ButtonW.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonW = QPushButton("W")
+        self.Letter_ButtonW.setObjectName("letter")
+        self.Letter_ButtonW.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonE = QPushButton("E")
-        Letter_ButtonE.setObjectName("letter")
-        Letter_ButtonE.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonE = QPushButton("E")
+        self.Letter_ButtonE.setObjectName("letter")
+        self.Letter_ButtonE.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonR = QPushButton("R")
-        Letter_ButtonR.setObjectName("letter")
-        Letter_ButtonR.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonR = QPushButton("R")
+        self.Letter_ButtonR.setObjectName("letter")
+        self.Letter_ButtonR.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonT = QPushButton("T")
-        Letter_ButtonT.setObjectName("letter")
-        Letter_ButtonT.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonT = QPushButton("T")
+        self.Letter_ButtonT.setObjectName("letter")
+        self.Letter_ButtonT.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonY = QPushButton("Y")
-        Letter_ButtonY.setObjectName("letter")
-        Letter_ButtonY.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonY = QPushButton("Y")
+        self.Letter_ButtonY.setObjectName("letter")
+        self.Letter_ButtonY.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonU = QPushButton("U")
-        Letter_ButtonU.setObjectName("letter")
-        Letter_ButtonU.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonU = QPushButton("U")
+        self.Letter_ButtonU.setObjectName("letter")
+        self.Letter_ButtonU.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonI = QPushButton("I")
-        Letter_ButtonI.setObjectName("letter")
-        Letter_ButtonI.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonI = QPushButton("I")
+        self.Letter_ButtonI.setObjectName("letter")
+        self.Letter_ButtonI.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonO = QPushButton("O")
-        Letter_ButtonO.setObjectName("letter")
-        Letter_ButtonO.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonO = QPushButton("O")
+        self.Letter_ButtonO.setObjectName("letter")
+        self.Letter_ButtonO.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonP = QPushButton("P")
-        Letter_ButtonP.setObjectName("letter")
-        Letter_ButtonP.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonP = QPushButton("P")
+        self.Letter_ButtonP.setObjectName("letter")
+        self.Letter_ButtonP.clicked.connect(self.Display_Letter)
 
         # Delete button (removes last character)
-        Letter_Button_Delete = QPushButton("⌫ Delete")
-        Letter_Button_Delete.setObjectName("delete")
-        Letter_Button_Delete.clicked.connect(self.Delete_Button)
+        self.Letter_Button_Delete = QPushButton("⌫ Delete")
+        self.Letter_Button_Delete.setObjectName("delete")
+        self.Letter_Button_Delete.clicked.connect(self.Delete_Button)
 
         # ============================================
         # KEYBOARD BUTTONS - ROW 2 (ASDFGHJKL)
         # ============================================
         # Create buttons for letters A through L (middle row of keyboard)
 
-        Letter_ButtonA = QPushButton("A")
-        Letter_ButtonA.setObjectName("letter")
-        Letter_ButtonA.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonA = QPushButton("A")
+        self.Letter_ButtonA.setObjectName("letter")
+        self.Letter_ButtonA.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonS = QPushButton("S")
-        Letter_ButtonS.setObjectName("letter")
-        Letter_ButtonS.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonS = QPushButton("S")
+        self.Letter_ButtonS.setObjectName("letter")
+        self.Letter_ButtonS.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonD = QPushButton("D")
-        Letter_ButtonD.setObjectName("letter")
-        Letter_ButtonD.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonD = QPushButton("D")
+        self.Letter_ButtonD.setObjectName("letter")
+        self.Letter_ButtonD.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonF = QPushButton("F")
-        Letter_ButtonF.setObjectName("letter")
-        Letter_ButtonF.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonF = QPushButton("F")
+        self.Letter_ButtonF.setObjectName("letter")
+        self.Letter_ButtonF.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonG = QPushButton("G")
-        Letter_ButtonG.setObjectName("letter")
-        Letter_ButtonG.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonG = QPushButton("G")
+        self.Letter_ButtonG.setObjectName("letter")
+        self.Letter_ButtonG.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonH = QPushButton("H")
-        Letter_ButtonH.setObjectName("letter")
-        Letter_ButtonH.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonH = QPushButton("H")
+        self.Letter_ButtonH.setObjectName("letter")
+        self.Letter_ButtonH.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonJ = QPushButton("J")
-        Letter_ButtonJ.setObjectName("letter")
-        Letter_ButtonJ.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonJ = QPushButton("J")
+        self.Letter_ButtonJ.setObjectName("letter")
+        self.Letter_ButtonJ.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonK = QPushButton("K")
-        Letter_ButtonK.setObjectName("letter")
-        Letter_ButtonK.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonK = QPushButton("K")
+        self.Letter_ButtonK.setObjectName("letter")
+        self.Letter_ButtonK.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonL = QPushButton("L")
-        Letter_ButtonL.setObjectName("letter")
-        Letter_ButtonL.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonL = QPushButton("L")
+        self.Letter_ButtonL.setObjectName("letter")
+        self.Letter_ButtonL.clicked.connect(self.Display_Letter)
 
         # Enter button (adds new line)
-        Letter_Button_Enter = QPushButton("⏎ Enter")
-        Letter_Button_Enter.setObjectName("enter")
-        Letter_Button_Enter.clicked.connect(self.Text_To_Speech)
+        self.Letter_Button_Enter = QPushButton("⏎ Enter")
+        self.Letter_Button_Enter.setObjectName("enter")
+        self.Letter_Button_Enter.clicked.connect(self.Text_To_Speech)
 
         # ============================================
         # KEYBOARD BUTTONS - ROW 3 (ZXCVBNM)
         # ============================================
         # Create buttons for letters Z through M (bottom row of keyboard)
 
-        Letter_ButtonZ = QPushButton("Z")
-        Letter_ButtonZ.setObjectName("letter")
-        Letter_ButtonZ.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonZ = QPushButton("Z")
+        self.Letter_ButtonZ.setObjectName("letter")
+        self.Letter_ButtonZ.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonX = QPushButton("X")
-        Letter_ButtonX.setObjectName("letter")
-        Letter_ButtonX.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonX = QPushButton("X")
+        self.Letter_ButtonX.setObjectName("letter")
+        self.Letter_ButtonX.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonC = QPushButton("C")
-        Letter_ButtonC.setObjectName("letter")
-        Letter_ButtonC.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonC = QPushButton("C")
+        self.Letter_ButtonC.setObjectName("letter")
+        self.Letter_ButtonC.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonV = QPushButton("V")
-        Letter_ButtonV.setObjectName("letter")
-        Letter_ButtonV.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonV = QPushButton("V")
+        self.Letter_ButtonV.setObjectName("letter")
+        self.Letter_ButtonV.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonB = QPushButton("B")
-        Letter_ButtonB.setObjectName("letter")
-        Letter_ButtonB.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonB = QPushButton("B")
+        self.Letter_ButtonB.setObjectName("letter")
+        self.Letter_ButtonB.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonN = QPushButton("N")
-        Letter_ButtonN.setObjectName("letter")
-        Letter_ButtonN.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonN = QPushButton("N")
+        self.Letter_ButtonN.setObjectName("letter")
+        self.Letter_ButtonN.clicked.connect(self.Display_Letter)
 
-        Letter_ButtonM = QPushButton("M")
-        Letter_ButtonM.setObjectName("letter")
-        Letter_ButtonM.clicked.connect(self.Display_Letter)
+        self.Letter_ButtonM = QPushButton("M")
+        self.Letter_ButtonM.setObjectName("letter")
+        self.Letter_ButtonM.clicked.connect(self.Display_Letter)
 
         # Space bar button (adds space between words)
-        Space_Bar = QPushButton("⎵ Space")
-        Space_Bar.setObjectName("space")
-        Space_Bar.clicked.connect(self.Space_Bar)
+        self.space_button = QPushButton("⎵ Space")
+        self.space_button.setObjectName("space")
+        self.space_button.clicked.connect(self.space_pressed)
 
         # ============================================
         # Emergency BUTTONS 
         # ============================================
         # Create pre-defined sentences in a button
     
-        EM1_Button = QPushButton("I Feel Pain!!")
-        EM1_Button.setObjectName("emergency_red")
-        EM1_Button.clicked.connect(self.Display_Letter)  
+        self.EM1_Button = QPushButton("I Feel Pain!!")
+        self.EM1_Button.setObjectName("emergency_red")
+        self.EM1_Button.clicked.connect(self.Display_Letter)  
         
-        EM2_Button = QPushButton("I Need Water")
-        EM2_Button.setObjectName("emergency_blue")
-        EM2_Button.clicked.connect(self.Display_Letter)
+        self.EM2_Button = QPushButton("I Need Water")
+        self.EM2_Button.setObjectName("emergency_blue")
+        self.EM2_Button.clicked.connect(self.Display_Letter)
         
-        EM3_Button = QPushButton("I Want Doctor")
-        EM3_Button.setObjectName("emergency_blue")
-        EM3_Button.clicked.connect(self.Display_Letter)
+        self.EM3_Button = QPushButton("I Want Doctor")
+        self.EM3_Button.setObjectName("emergency_blue")
+        self.EM3_Button.clicked.connect(self.Display_Letter)
         
-        EM4_Button = QPushButton("I Want To Eat")
-        EM4_Button.setObjectName("emergency_blue")
-        EM4_Button.clicked.connect(self.Display_Letter)
+        self.EM4_Button = QPushButton("I Want To Eat")
+        self.EM4_Button.setObjectName("emergency_blue")
+        self.EM4_Button.clicked.connect(self.Display_Letter)
         
-        EM5_Button = QPushButton("Clear The screen")
-        EM5_Button.setObjectName("emergency_blue")
-        EM5_Button.clicked.connect(self.Clear_Whole_Text)
+        self.EM5_Button = QPushButton("Clear The screen")
+        self.EM5_Button.setObjectName("emergency_blue")
+        self.EM5_Button.clicked.connect(self.Clear_Whole_Text)
 
-        EM6_Button = QPushButton("EN <-> AR")
-        EM6_Button.setObjectName("emergency_blue")
-        EM6_Button.clicked.connect(self.Change_Lang)
+        self.EM6_Button = QPushButton("EN <-> AR")
+        self.EM6_Button.setObjectName("emergency_blue")
+        self.EM6_Button.clicked.connect(self.Change_Lang)
         
         # ============================================
         # LAYOUT SETUP - ORGANIZING THE INTERFACE
         # ============================================
 
         #Creating a Vertical Layout For the Emergencey Buttons
-        Vertical_EM_Button = QVBoxLayout()
-        Vertical_EM_Button.setSpacing(layout_spacing)
-        Vertical_EM_Button.setContentsMargins(layout_margin, layout_margin, layout_margin, layout_margin)
-        Vertical_EM_Button.addWidget(EM1_Button)
-        Vertical_EM_Button.addWidget(EM2_Button)
-        Vertical_EM_Button.addWidget(EM3_Button)
-        Vertical_EM_Button.addWidget(EM4_Button)
-        Vertical_EM_Button.addWidget(EM5_Button)
-        Vertical_EM_Button.addWidget(EM6_Button)
+        self.Vertical_EM_Button = QVBoxLayout()
+        self.Vertical_EM_Button.addWidget(self.EM1_Button)
+        self.Vertical_EM_Button.addWidget(self.EM2_Button)
+        self.Vertical_EM_Button.addWidget(self.EM3_Button)
+        self.Vertical_EM_Button.addWidget(self.EM4_Button)
+        self.Vertical_EM_Button.addWidget(self.EM5_Button)
+        self.Vertical_EM_Button.addWidget(self.EM6_Button)
 
-        Vertical_TextArea = QVBoxLayout()
-        Vertical_TextArea.addWidget(Thebes_Label, stretch=2)
-        Vertical_TextArea.addWidget(Display_Label, stretch=0)
-        Vertical_TextArea.addWidget(self.text_holder_label, stretch=2)
+        self.Vertical_TextArea = QVBoxLayout()
+        self.Vertical_TextArea.addWidget(self.Thebes_Label, stretch=2)    # reduced stretch
+        self.Vertical_TextArea.addWidget(self.Display_Label, stretch=0)
+        self.Vertical_TextArea.addWidget(self.text_holder_label, stretch=1.5)
 
         # HORIZONTAL LAYOUT: Text display area
-        H_layout = QHBoxLayout()
-        H_layout.setSpacing(layout_spacing)
-        H_layout.addLayout(Vertical_EM_Button)
-        H_layout.addLayout(Vertical_TextArea)
-        # Give MORE space to the EM column
-        H_layout.setStretch(0, 2)
-        H_layout.setStretch(1, 3)
+        self.H_layout = QHBoxLayout()
+        self.H_layout.addLayout(self.Vertical_EM_Button)
+        self.H_layout.addLayout(self.Vertical_TextArea)
+        self.H_layout.setStretch(0, 2)
+        self.H_layout.setStretch(1, 3)
     
         # KEYBOARD ROW 1 LAYOUT: Q W E R T Y U I O P + Delete
-        Keyboard_Layout_ROW1 = QHBoxLayout()
-        Keyboard_Layout_ROW1.setSpacing(layout_spacing)
-        Keyboard_Layout_ROW1.addWidget(Letter_ButtonQ)
-        Keyboard_Layout_ROW1.addWidget(Letter_ButtonW)
-        Keyboard_Layout_ROW1.addWidget(Letter_ButtonE)
-        Keyboard_Layout_ROW1.addWidget(Letter_ButtonR)
-        Keyboard_Layout_ROW1.addWidget(Letter_ButtonT)
-        Keyboard_Layout_ROW1.addWidget(Letter_ButtonY)
-        Keyboard_Layout_ROW1.addWidget(Letter_ButtonU)
-        Keyboard_Layout_ROW1.addWidget(Letter_ButtonI)
-        Keyboard_Layout_ROW1.addWidget(Letter_ButtonO)
-        Keyboard_Layout_ROW1.addWidget(Letter_ButtonP)
-        Keyboard_Layout_ROW1.addWidget(Letter_Button_Delete)
+        self.Keyboard_Layout_ROW1 = QHBoxLayout()
+        self.Keyboard_Layout_ROW1.addWidget(self.Letter_ButtonQ)
+        self.Keyboard_Layout_ROW1.addWidget(self.Letter_ButtonW)
+        self.Keyboard_Layout_ROW1.addWidget(self.Letter_ButtonE)
+        self.Keyboard_Layout_ROW1.addWidget(self.Letter_ButtonR)
+        self.Keyboard_Layout_ROW1.addWidget(self.Letter_ButtonT)
+        self.Keyboard_Layout_ROW1.addWidget(self.Letter_ButtonY)
+        self.Keyboard_Layout_ROW1.addWidget(self.Letter_ButtonU)
+        self.Keyboard_Layout_ROW1.addWidget(self.Letter_ButtonI)
+        self.Keyboard_Layout_ROW1.addWidget(self.Letter_ButtonO)
+        self.Keyboard_Layout_ROW1.addWidget(self.Letter_ButtonP)
+        self.Keyboard_Layout_ROW1.addWidget(self.Letter_Button_Delete)
         
         # KEYBOARD ROW 2 LAYOUT: A S D F G H J K L + Enter
-        Keyboard_Layout_ROW2 = QHBoxLayout()
-        Keyboard_Layout_ROW2.setSpacing(layout_spacing)
-        Keyboard_Layout_ROW2.addWidget(Letter_ButtonA)
-        Keyboard_Layout_ROW2.addWidget(Letter_ButtonS)
-        Keyboard_Layout_ROW2.addWidget(Letter_ButtonD)
-        Keyboard_Layout_ROW2.addWidget(Letter_ButtonF)
-        Keyboard_Layout_ROW2.addWidget(Letter_ButtonG)
-        Keyboard_Layout_ROW2.addWidget(Letter_ButtonH)
-        Keyboard_Layout_ROW2.addWidget(Letter_ButtonJ)
-        Keyboard_Layout_ROW2.addWidget(Letter_ButtonK)
-        Keyboard_Layout_ROW2.addWidget(Letter_ButtonL)
-        Keyboard_Layout_ROW2.addWidget(Letter_Button_Enter)
+        self.Keyboard_Layout_ROW2 = QHBoxLayout()
+        self.Keyboard_Layout_ROW2.addWidget(self.Letter_ButtonA)
+        self.Keyboard_Layout_ROW2.addWidget(self.Letter_ButtonS)
+        self.Keyboard_Layout_ROW2.addWidget(self.Letter_ButtonD)
+        self.Keyboard_Layout_ROW2.addWidget(self.Letter_ButtonF)
+        self.Keyboard_Layout_ROW2.addWidget(self.Letter_ButtonG)
+        self.Keyboard_Layout_ROW2.addWidget(self.Letter_ButtonH)
+        self.Keyboard_Layout_ROW2.addWidget(self.Letter_ButtonJ)
+        self.Keyboard_Layout_ROW2.addWidget(self.Letter_ButtonK)
+        self.Keyboard_Layout_ROW2.addWidget(self.Letter_ButtonL)
+        self.Keyboard_Layout_ROW2.addWidget(self.Letter_Button_Enter)
         
         # KEYBOARD ROW 3 LAYOUT: Z X C V B N M
-        Keyboard_Layout_ROW3 = QHBoxLayout()
-        Keyboard_Layout_ROW3.setSpacing(layout_spacing)
-        Keyboard_Layout_ROW3.addWidget(Letter_ButtonZ)  
-        Keyboard_Layout_ROW3.addWidget(Letter_ButtonX)
-        Keyboard_Layout_ROW3.addWidget(Letter_ButtonC)
-        Keyboard_Layout_ROW3.addWidget(Letter_ButtonV)
-        Keyboard_Layout_ROW3.addWidget(Letter_ButtonB)
-        Keyboard_Layout_ROW3.addWidget(Letter_ButtonN)
-        Keyboard_Layout_ROW3.addWidget(Letter_ButtonM)
+        self.Keyboard_Layout_ROW3 = QHBoxLayout()
+        self.Keyboard_Layout_ROW3.addWidget(self.Letter_ButtonZ)  
+        self.Keyboard_Layout_ROW3.addWidget(self.Letter_ButtonX)
+        self.Keyboard_Layout_ROW3.addWidget(self.Letter_ButtonC)
+        self.Keyboard_Layout_ROW3.addWidget(self.Letter_ButtonV)
+        self.Keyboard_Layout_ROW3.addWidget(self.Letter_ButtonB)
+        self.Keyboard_Layout_ROW3.addWidget(self.Letter_ButtonN)
+        self.Keyboard_Layout_ROW3.addWidget(self.Letter_ButtonM)
         
         # KEYBOARD ROW 4 LAYOUT: Space bar
-        Keyboard_Layout_ROW4 = QHBoxLayout()
-        Keyboard_Layout_ROW4.setSpacing(layout_spacing)
-        Keyboard_Layout_ROW4.addWidget(Space_Bar)
+        self.Keyboard_Layout_ROW4 = QHBoxLayout()
+        self.Keyboard_Layout_ROW4.addWidget(self.space_button)
         
         # MAIN VERTICAL LAYOUT: Stack all layouts vertically
-        V_layout = QVBoxLayout()
-        V_layout.setSpacing(layout_spacing)
-        V_layout.setContentsMargins(layout_margin, layout_margin, layout_margin, layout_margin)
-        V_layout.addLayout(H_layout)           # Text display area
-        V_layout.addLayout(Keyboard_Layout_ROW1)  # Keyboard row 1
-        V_layout.addLayout(Keyboard_Layout_ROW2)  # Keyboard row 2
-        V_layout.addLayout(Keyboard_Layout_ROW3)  # Keyboard row 3
-        V_layout.addLayout(Keyboard_Layout_ROW4)  # Keyboard row 4 (space bar)
+        self.V_layout = QVBoxLayout()
+        self.V_layout.addLayout(self.H_layout)           # Text display area
+        self.V_layout.addLayout(self.Keyboard_Layout_ROW1)  # Keyboard row 1
+        self.V_layout.addLayout(self.Keyboard_Layout_ROW2)  # Keyboard row 2
+        self.V_layout.addLayout(self.Keyboard_Layout_ROW3)  # Keyboard row 3
+        self.V_layout.addLayout(self.Keyboard_Layout_ROW4)  # Keyboard row 4 (space bar)
         
         # Set the main layout for the widget
-        self.setLayout(V_layout)
+        self.setLayout(self.V_layout)
         
         # ============================================
-        # APPLY GLOBAL STYLESHEET WITH DYNAMIC SIZES
+        # INITIAL SCALING & STYLESHEET
         # ============================================
+        self.update_sizes()
+
+    def update_sizes(self):
+        """Recalculate all sizes based on current widget dimensions and reapply stylesheet."""
+        # Get current widget size
+        w = self.width()
+        h = self.height()
+        if w == 0 or h == 0:
+            return
+        
+        # Compute new scale (fits both width and height)
+        scale_w = w / self.ref_w
+        scale_h = h / self.ref_h
+        new_scale = min(scale_w, scale_h)
+        new_scale = max(0.5, min(new_scale, 1.5))  # clamp
+        
+        # Only update if scale changed significantly to avoid flicker
+        if abs(new_scale - self.scale) < 0.01:
+            return
+        
+        self.scale = new_scale
+        
+        # Compute scaled values
+        font_size = int(self.base_font_size * self.scale)
+        padding = int(self.base_padding * self.scale)
+        delete_font = int(self.base_delete_font * self.scale)
+        enter_font = int(self.base_enter_font * self.scale)
+        space_font = int(self.base_space_font * self.scale)
+        space_padding = int(self.base_space_padding * self.scale)
+        em_font = int(self.base_em_font * self.scale)
+        em_padding = int(self.base_em_padding * self.scale)
+        em_height = int(self.base_em_height * self.scale)
+        em_min_width = int(self.base_em_min_width * self.scale)
+        logo_width = int(self.base_logo_width * self.scale)
+        logo_height = int(self.base_logo_height * self.scale)
+        layout_spacing = int(self.base_layout_spacing * self.scale)
+        layout_margin = int(self.base_layout_margin * self.scale)
+        label_font = int(self.base_label_font * self.scale)
+        text_holder_font = int(self.base_text_holder_font * self.scale)
+        text_holder_padding = int(self.base_text_holder_padding * self.scale)
+        
+        # Update logo
+        scaled_pixmap = self.Thebes_Logo.scaled(logo_width, logo_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        self.Thebes_Label.setPixmap(scaled_pixmap)
+        
+        # Set maximum height for text holder to keep it single‑line
+        self.text_holder_label.setMaximumHeight(int(text_holder_font * 1.8))
+        
+        # Update layout margins and spacings
+        self.V_layout.setSpacing(layout_spacing)
+        self.V_layout.setContentsMargins(layout_margin, layout_margin, layout_margin, layout_margin)
+        self.H_layout.setSpacing(layout_spacing)
+        self.Vertical_EM_Button.setSpacing(layout_spacing)
+        self.Vertical_EM_Button.setContentsMargins(layout_margin, layout_margin, layout_margin, layout_margin)
+        self.Vertical_TextArea.setSpacing(layout_spacing)
+        self.Keyboard_Layout_ROW1.setSpacing(layout_spacing)
+        self.Keyboard_Layout_ROW2.setSpacing(layout_spacing)
+        self.Keyboard_Layout_ROW3.setSpacing(layout_spacing)
+        self.Keyboard_Layout_ROW4.setSpacing(layout_spacing)
+        
+        # Update stylesheet
         self.setStyleSheet(f"""
+            QLabel#display_label {{
+                color: #FF4500;
+                qproperty-alignment: AlignCenter;
+                font-size: {label_font}px;
+                max-height: {label_font}px;
+            }}
+            QLabel#text_holder {{
+                padding: {text_holder_padding}px;
+                font-size: {text_holder_font}px;
+                border-radius: 5px;
+                background-color: #75706f;
+            }}
             QPushButton#letter {{
                 color: black;
                 background-color: #f8f9fa;
@@ -430,6 +471,11 @@ class Widget_EN(QWidget):
             }}
         """)
     
+    def resizeEvent(self, event: QResizeEvent):
+        """Handle window resize to update sizes dynamically."""
+        super().resizeEvent(event)
+        self.update_sizes()
+    
     # ============================================
     # BUTTON HANDLER FUNCTIONS
     # ============================================
@@ -449,12 +495,10 @@ class Widget_EN(QWidget):
             # Update the display to show the complete typed text
             self.text_holder_label.setText(f"{self.current_text}")
     
-    def Space_Bar(self):
-        # Add a space character to separate words
+    def space_pressed(self):
+        """Add a space character to the current text."""
         self.current_text += " "
-        
-        # Update the display
-        self.text_holder_label.setText(f"{self.current_text}")
+        self.text_holder_label.setText(self.current_text)
     
     def Delete_Button(self):
         # Remove the last character (if there is any text)
