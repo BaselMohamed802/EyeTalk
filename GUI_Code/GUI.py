@@ -36,6 +36,7 @@ english_widget.Language_Change_req.connect(switch_to_arabic)
 arabic_widget.Language_Change_req.connect(switch_to_english)
 
 #stack.showMaximized()
+#stack.showFullScreen()
 stack.show()
 
 app.exec()

@@ -40,8 +40,8 @@ class Widget_EN(QWidget):
         self.base_em_height = 50
         self.base_em_min_width = 50
         
-        self.base_logo_width = 300
-        self.base_logo_height = 100
+        self.base_logo_width = 150
+        self.base_logo_height = 38
         self.base_layout_spacing = 6
         self.base_layout_margin = 5
         self.base_label_font = 15
@@ -257,7 +257,7 @@ class Widget_EN(QWidget):
         self.Vertical_EM_Button.addWidget(self.EM6_Button)
 
         self.Vertical_TextArea = QVBoxLayout()
-        self.Vertical_TextArea.addWidget(self.Thebes_Label, stretch=3)    
+        self.Vertical_TextArea.addWidget(self.Thebes_Label, stretch=1)    
         self.Vertical_TextArea.addWidget(self.Display_Label, stretch=0)
         self.Vertical_TextArea.addWidget(self.text_holder_label, stretch=1)
 
