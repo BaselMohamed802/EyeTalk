@@ -26,32 +26,37 @@ class Widget_AR(QWidget):
         size = screen.size()
         screen_w, screen_h = size.width(), size.height()
         
-        # Target 1024x600 as reference
+        # Reference: your 10" 1024x600 touchscreen
         ref_w, ref_h = 1024, 600
-        scale = min(screen_w / ref_w, screen_h / ref_h)
-        scale = max(0.6, min(scale, 1.8))
+        
+        # Compute scale as average of width and height ratios (like head_tracking_gui)
+        scale_w = screen_w / ref_w
+        scale_h = screen_h / ref_h
+        self.scale = (scale_w + scale_h) / 2.0
+        self.scale = max(0.7, min(self.scale, 1.8))  # clamp to avoid extremes
         
         # Sizes derived from scale
-        font_size = int(16 * scale)
-        padding = int(12 * scale)
-        delete_font = int(14 * scale)
-        enter_font = int(14 * scale)
-        space_font = int(14 * scale)
-        space_padding = int(20 * scale)
+        font_size = int(16 * self.scale)
+        padding = int(5 * self.scale)
+        delete_font = int(14 * self.scale)
+        enter_font = int(14 * self.scale)
+        space_font = int(14 * self.scale)
+        space_padding = int(5 * self.scale)
         
         # Emergency buttons
-        em_font = int(18 * scale)         
-        em_padding = int(10 * scale)      
-        em_height = int(19 * scale)        
-        em_min_width = int(100 * scale)    
+        em_font = int(18 * self.scale)         
+        em_padding = int(10 * self.scale)      
+        em_height = int(19 * self.scale)        
+        em_min_width = int(100 * self.scale)    
         
-        logo_width = int(400 * scale)
-        logo_height = int(100 * scale)
-        layout_spacing = int(5 * scale)
-        layout_margin = int(30 * scale)
-        label_font = int(15 * scale)
-        text_holder_font = int(20 * scale)
-        text_holder_padding = int(50 * scale)
+        logo_width = int(400 * self.scale)
+        logo_height = int(100 * self.scale)
+        layout_spacing = int(5 * self.scale)
+        layout_margin = int(10 * self.scale)
+        label_font = int(15 * self.scale)
+        text_holder_font = int(20 * self.scale)
+        text_holder_padding = int(30 * self.scale)
+        
         
         # ============================================
         # WINDOW SETUP
