@@ -41,12 +41,12 @@ class Widget_AR(QWidget):
         self.base_logo_width = 300
         self.base_logo_height = 100
         self.base_layout_spacing = 6
-        self.base_layout_margin = 15
+        self.base_layout_margin = 5
         self.base_label_font = 15
         
         # Text box 
-        self.base_text_holder_font = 18   
-        self.base_text_holder_padding = 15 
+        self.base_text_holder_font = 20  
+        self.base_text_holder_padding = 5
         
         # Current scale (will be computed in resizeEvent)
         self.scale = 1.0
@@ -403,7 +403,7 @@ class Widget_AR(QWidget):
         self.Thebes_Label.setPixmap(scaled_pixmap)
         
         # Set maximum height for text holder to keep it single‑line
-        self.text_holder_label.setMaximumHeight(int(text_holder_font * 1.8))
+        self.text_holder_label.setMaximumHeight(int(text_holder_font * 3))
         
         # Update layout margins and spacings
         self.V_layout.setSpacing(layout_spacing)

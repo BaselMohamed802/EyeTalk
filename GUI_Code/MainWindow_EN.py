@@ -47,8 +47,8 @@ class Widget_EN(QWidget):
         self.base_label_font = 15
         
         # Text box 
-        self.base_text_holder_font = 18   
-        self.base_text_holder_padding = 15 
+        self.base_text_holder_font = 20   
+        self.base_text_holder_padding = 5
         
         # Current scale (will be computed in resizeEvent)
         self.scale = 1.0
@@ -257,9 +257,9 @@ class Widget_EN(QWidget):
         self.Vertical_EM_Button.addWidget(self.EM6_Button)
 
         self.Vertical_TextArea = QVBoxLayout()
-        self.Vertical_TextArea.addWidget(self.Thebes_Label, stretch=0)    
+        self.Vertical_TextArea.addWidget(self.Thebes_Label, stretch=3)    
         self.Vertical_TextArea.addWidget(self.Display_Label, stretch=0)
-        self.Vertical_TextArea.addWidget(self.text_holder_label, stretch=0)
+        self.Vertical_TextArea.addWidget(self.text_holder_label, stretch=1)
 
         # HORIZONTAL LAYOUT: Text display area
         self.H_layout = QHBoxLayout()
@@ -369,7 +369,7 @@ class Widget_EN(QWidget):
         self.Thebes_Label.setPixmap(scaled_pixmap)
         
         # Set maximum height for text holder to keep it single‑line
-        self.text_holder_label.setMaximumHeight(int(text_holder_font * 1.8))
+        self.text_holder_label.setMaximumHeight(int(text_holder_font * 3))
         
         # Update layout margins and spacings
         self.V_layout.setSpacing(layout_spacing)
