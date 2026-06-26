@@ -1,6 +1,13 @@
+import sys
+import os
 from PySide6.QtWidgets import QApplication, QStackedWidget
 from PySide6.QtCore import Signal
-import sys
+
+# --- 🌟 ADDED FOR RASPBERRY PI SCALING 🌟 ---
+os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "1"
+os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
+os.environ["QT_SCALE_FACTOR"] = "1"
+
 from MainWindow_EN import Widget_EN
 from MainWindow_AR import Widget_AR
 
@@ -35,8 +42,7 @@ stack.addWidget(arabic_widget)   # Index 1
 english_widget.Language_Change_req.connect(switch_to_arabic)
 arabic_widget.Language_Change_req.connect(switch_to_english)
 
-#stack.showMaximized()
-#stack.showFullScreen()
+stack.showMaximized()
 stack.show()
 
 app.exec()
